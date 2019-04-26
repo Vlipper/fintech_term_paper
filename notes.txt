@@ -1,0 +1,20 @@
+ToDo:
+- 
+
+
+ToRead:
+- WaveNet -- https://arxiv.org/abs/1609.03499
+- CNN + graphs -- https://arxiv.org/pdf/1805.00165.pdf
+
+PossibleToRead:
+- Спектральная плотность сигнала -- https://habr.com/en/post/448078/
+
+
+
+General:
+- Decrease train size -- https://www.kaggle.com/friedchips/how-to-reduce-the-training-data-to-400mb
+- источники от LANL: https://scholar.google.fr/citations?user=TDnMb_QAAAAJ&hl=en
+
+
+Questions:
+- Одинаковые ли распределения в тесте?
