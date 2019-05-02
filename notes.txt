@@ -9,12 +9,17 @@ ToRead:
 PossibleToRead:
 - Спектральная плотность сигнала -- https://habr.com/en/post/448078/
 
+Questions:
+- Одинаковые ли распределения в тесте?
 
 
 General:
 - Decrease train size -- https://www.kaggle.com/friedchips/how-to-reduce-the-training-data-to-400mb
 - источники от LANL: https://scholar.google.fr/citations?user=TDnMb_QAAAAJ&hl=en
 
+Commands:
+- cd /mntlong/lanl_comp/lanl_comp/
+- python3.7 train_spect.py
+- tensorboard --logdir /mntlong/lanl_comp/lanl_comp/runs/
+- ssh -N -f -L 6006:localhost:6006 168.62.161.216
 
-Questions:
-- Одинаковые ли распределения в тесте?

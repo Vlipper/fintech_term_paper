@@ -4,8 +4,7 @@ import numpy as np
 import torch.optim as optim
 from torch.utils.data import DataLoader
 # from torch.utils.data.sampler import BatchSampler # Sampler,
-# import torchvision
-# from torchvision import models as tv_models
+from torchvision import models as tv_models
 from tensorboardX import SummaryWriter
 
 # import local scripts
@@ -34,17 +33,21 @@ val_quaketime = train_quaketime[val_start_idx:]
 train_signal = train_signal[:val_start_idx]
 train_quaketime = train_quaketime[:val_start_idx]
 
+# get modified resnet model
+model = tv_models.resnet34(pretrained=True)
+model = models.get_resnet(model)
 
 # training process
 logs_path = '/mntlong/lanl_comp/logs/'
 batch_size = 1300
+num_epochs = 10
 model_name = 'spectr_net_v1'
 window_size = 10000
 overlap_size = window_size // 2
 
 train_loader = DataLoader(
     dataset=data.SpectrogramDataset(train_signal, train_quaketime,
-                                    hz_cutoff=0, window_size=window_size,
+                                    hz_cutoff=700000, window_size=window_size,
                                     overlap_size=overlap_size),
     batch_size=batch_size,
     shuffle=True,
@@ -59,12 +62,12 @@ val_loader = DataLoader(
     num_workers=5,
     pin_memory=True)
 
-simple_net = models.BaselineNetSpect()
-opt = optim.Adam(simple_net.parameters(), lr=1e-2)
+# model = models.BaselineNetSpect()
+opt = optim.Adam(model.parameters(), lr=1e-2)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
 log_writer = SummaryWriter()
 
-utils.train_model(model=simple_net, optimizer=opt, lr_scheduler=lr_sched,
+utils.train_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
                   train_loader=train_loader, val_loader=val_loader,
-                  num_epochs=50, model_name=model_name,
+                  num_epochs=num_epochs, model_name=model_name,
                   logs_path=logs_path, log_writer=log_writer)

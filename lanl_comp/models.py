@@ -1,6 +1,5 @@
+from collections import OrderedDict
 import torch.nn as nn
-# import torchvision
-# from torchvision import models as torch_models
 
 
 class BaselineNetOneChannel(nn.Module):
@@ -114,3 +113,28 @@ class BaselineNetSpect(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.head(x)
         return x
+
+
+class Flatten(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+
+def get_resnet(torchvision_resnet):
+    modules = [*torchvision_resnet.named_children()]
+
+    # layers modification
+    modules.insert(-1, ('flatten', Flatten()))
+    modules = OrderedDict(modules)
+    modules['conv1'] = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2),
+                                 padding=(3, 3), bias=False)
+    del modules['maxpool']
+    modules['fc'] = nn.Linear(in_features=modules['fc'].in_features,
+                              out_features=1,
+                              bias=True)
+
+    resnet_mod = nn.Sequential(modules)
+    return resnet_mod
