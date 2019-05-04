@@ -8,7 +8,7 @@ cuda = torch.device('cuda')
 cpu = torch.device('cpu')
 
 
-def spectrogram(sig_in):
+def spectrogram(sig_in, nperseg):
     """
     Params:
     sig_in -- input signal
@@ -16,12 +16,12 @@ def spectrogram(sig_in):
     Return:
     f, t, np.log(Sxx + eps)
     """
-    nperseg = 128  # default 256 -- размер окна
+    nperseg = nperseg  # default 256 -- размер окна
     noverlap = nperseg // 8
     fs = 4 * 1e+6  # raw signal sample rate is 4MHz
-    window = 'hanning'  # triang, hanning
-    detrend = False  # {'linear', 'constant', False}
-    scaling = 'spectrum'  # {'density', 'spectrum'}
+    window = 'hamming'  # {triang, hamming}
+    detrend = 'linear'  # {'linear', 'constant', False}
+    scaling = 'density'  # {'density', 'spectrum'}
     eps = 1e-11
     f, t, Sxx = signal.spectrogram(sig_in, fs=fs, window=window,
                                    nperseg=nperseg, noverlap=noverlap,

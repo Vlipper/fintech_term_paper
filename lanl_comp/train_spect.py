@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pandas as pd
 import numpy as np
 
@@ -33,39 +35,49 @@ val_quaketime = train_quaketime[val_start_idx:]
 train_signal = train_signal[:val_start_idx]
 train_quaketime = train_quaketime[:val_start_idx]
 
-# get modified resnet model
-model = tv_models.resnet34(pretrained=True)
-model = models.get_resnet(model)
+# training params
+model_name = 'spectr_net_v1_window5'
+batch_size = 500  # 1300
+num_epochs = 3
 
-# training process
-logs_path = '/mntlong/lanl_comp/logs/'
-batch_size = 1300
-num_epochs = 10
-model_name = 'spectr_net_v1'
+hz_cutoff = 0  # {0, ..., 600000, ...}
 window_size = 10000
-overlap_size = window_size // 2
+overlap_size = int(window_size * 0.5)  # window_size // 2
+nperseg = 64
 
-train_loader = DataLoader(
-    dataset=data.SpectrogramDataset(train_signal, train_quaketime,
-                                    hz_cutoff=700000, window_size=window_size,
-                                    overlap_size=overlap_size),
-    batch_size=batch_size,
-    shuffle=True,
-    num_workers=5,
-    pin_memory=True)
-val_loader = DataLoader(
-    dataset=data.SpectrogramDataset(val_signal, val_quaketime,
-                                    hz_cutoff=0, window_size=window_size,
-                                    overlap_size=overlap_size),
-    batch_size=batch_size,
-    shuffle=False,
-    num_workers=5,
-    pin_memory=True)
+logs_path = '/mntlong/lanl_comp/logs/'
+current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
+log_writer_path = logs_path + 'runs/' + current_datetime + '_' + model_name
 
+train_dataset = data.SpectrogramDataset(train_signal, train_quaketime,
+                                        hz_cutoff=hz_cutoff, window_size=window_size,
+                                        overlap_size=overlap_size,
+                                        nperseg=nperseg)
+val_dataset = data.SpectrogramDataset(val_signal, val_quaketime,
+                                      hz_cutoff=hz_cutoff, window_size=window_size,
+                                      overlap_size=overlap_size,
+                                      nperseg=nperseg)
+
+print('spectrogram size:', train_dataset[0][0].size())
+
+train_loader = DataLoader(dataset=train_dataset,
+                          batch_size=batch_size,
+                          shuffle=True,
+                          num_workers=5,
+                          pin_memory=True)
+val_loader = DataLoader(dataset=val_dataset,
+                        batch_size=batch_size,
+                        shuffle=False,
+                        num_workers=5,
+                        pin_memory=True)
+
+# get modified resnet model
+model = tv_models.resnet18(pretrained=True)
+model = models.get_resnet(model)
 # model = models.BaselineNetSpect()
-opt = optim.Adam(model.parameters(), lr=1e-2)
+opt = optim.Adam(model.parameters(), lr=1e-3)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
-log_writer = SummaryWriter()
+log_writer = SummaryWriter(log_writer_path)
 
 utils.train_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
                   train_loader=train_loader, val_loader=val_loader,

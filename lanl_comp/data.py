@@ -7,15 +7,17 @@ import utils
 
 # signal dataset
 class SignalDataset(Dataset):
-    def __init__(self, signal, target, exmpl_size=10000):
+    def __init__(self, signal, target, window_size=10000, overlap_size=5000):
         super().__init__()
 
         self.signal = signal
         self.target = target
+
         # make borders for every example
-        self.boarder_points = [(i * exmpl_size, (i + 1) * exmpl_size)
-                               for i in range(signal.shape[0] // exmpl_size + 1)]
-        self.boarder_points = self.boarder_points[:-1]
+        wave_size = signal.shape[0]
+        self.boarder_points = [(i, i + window_size)
+                               for i in range(0, wave_size, window_size - overlap_size)
+                               if i + window_size <= wave_size]
 
     def __len__(self):
         return len(self.boarder_points)
@@ -28,12 +30,16 @@ class SignalDataset(Dataset):
 # spectrogram dataset
 class SpectrogramDataset(Dataset):
     def __init__(self, signal, target=None, hz_cutoff=600000,
-                 window_size=10000, overlap_size=5000):
+                 window_size=10000, overlap_size=5000,
+                 nperseg=256):
         super().__init__()
 
         self.signal = signal
         self.target = target
         self.hz_cutoff = hz_cutoff
+
+        # spectrogram func params
+        self.nperseg = nperseg
 
         # make borders for every example
         # self.boarder_points = [(i * exmpl_size, (i + 1) * exmpl_size)
@@ -49,7 +55,8 @@ class SpectrogramDataset(Dataset):
 
     def __getitem__(self, index):
         start_idx, end_idx = self.boarder_points[index]
-        f, _, spec = utils.spectrogram(self.signal[start_idx:end_idx])
+        f, _, spec = utils.spectrogram(self.signal[start_idx:end_idx],
+                                       self.nperseg)
 
         if self.hz_cutoff:
             cutoff = f[f <= self.hz_cutoff].shape[0]
@@ -60,5 +67,7 @@ class SpectrogramDataset(Dataset):
         if self.target is not None:
             target = torch.tensor(self.target[end_idx - 1])
             return spec.view(1, spec.size(0), -1), target
+            # return spec.expand(3, -1, -1), target
         else:
             return spec.view(1, spec.size(0), -1)
+            # return spec.expand(3, -1, -1)

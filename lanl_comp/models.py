@@ -2,83 +2,38 @@ from collections import OrderedDict
 import torch.nn as nn
 
 
-class BaselineNetOneChannel(nn.Module):
+class BaselineNetRawSignal(nn.Module):
     def __init__(self):
         super().__init__()
 
         self.body = nn.Sequential(
-            nn.Conv1d(1, 1, 2, stride=1),
+            nn.Conv1d(1, 16, 2, stride=1),
             nn.ReLU(),
 
-            nn.Conv1d(1, 1, 2, stride=2, dilation=1+1),
+            nn.Conv1d(16, 16, 2, stride=2, dilation=1+1),
             nn.ReLU(),
 
-            nn.Conv1d(1, 1, 2, stride=2, dilation=1+2),
+            nn.Conv1d(16, 16, 2, stride=2, dilation=1+2),
             nn.ReLU(),
 
-            nn.Conv1d(1, 1, 2, stride=2, dilation=1+4),
+            nn.Conv1d(16, 32, 2, stride=2, dilation=1+4),
             nn.ReLU(),
 
-            nn.Conv1d(1, 1, 2, stride=2, dilation=1+8),
+            nn.Conv1d(32, 32, 2, stride=2, dilation=1+8),
             nn.ReLU(),
 
-            nn.Conv1d(1, 1, 2, stride=2, dilation=1+16),
+            nn.Conv1d(32, 64, 2, stride=2, dilation=1+16),
             nn.ReLU(),
 
-            nn.Conv1d(1, 1, 2, stride=2, dilation=1+32),
+            nn.Conv1d(64, 64, 2, stride=2, dilation=1+32),
             nn.ReLU(),
 
-            nn.Conv1d(1, 1, 2, stride=2, dilation=1+64),
-            nn.ReLU(),
+            nn.Conv1d(64, 128, 2, stride=2, dilation=1+64),
+            # nn.ReLU(),
 
-            nn.Conv1d(1, 1, 2, stride=2, dilation=1+32)
-        )
-
-    def forward(self, inpt):
-        return self.body(inpt)
-
-
-class BaselineNetThreeChannel(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.body = nn.Sequential(
-            nn.Conv1d(1, 3, 2, stride=1),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+1),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+2),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+4),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+8),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+16),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+32),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+64),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+128),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 3, 2, stride=2, dilation=1+256),
-            nn.ReLU(),
-
-            nn.Conv1d(3, 1, 2, stride=2),
-            nn.ReLU(),
-
-            nn.Linear(61, 1)
-
-            # nn.Conv1d(3, 1, 2, stride=2, dilation=1+32)
+            nn.AdaptiveAvgPool1d(1),
+            Flatten(),
+            nn.Linear(in_features=128, out_features=1, bias=True)
         )
 
     def forward(self, inpt):

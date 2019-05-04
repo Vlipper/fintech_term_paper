@@ -1,9 +1,12 @@
+from datetime import datetime
+
 import pandas as pd
 import numpy as np
 
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from tensorboardX import SummaryWriter
 
 # import local scripts
 import data
@@ -34,30 +37,44 @@ val_quaketime = train_quaketime[val_start_idx:]
 train_signal = train_signal[:val_start_idx]
 train_quaketime = train_quaketime[:val_start_idx]
 
+# training params
+model_name = 'wave_net_v1_window5'
+batch_size = 900
+num_epochs = 50
 
-# training process
+window_size = 25000
+overlap_size = int(window_size * 0.9)  # window_size // 2
+
 logs_path = '/mntlong/lanl_comp/logs/'
-batch_size = 10000
-model_name = 'simple_net_v2'
-window_size = 10000
+current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
+log_writer_path = logs_path + 'runs/' + current_datetime + '_' + model_name
 
-train_loader = DataLoader(
-    dataset=data.SignalDataset(train_signal, train_quaketime, window_size),
-    batch_size=batch_size,
-    shuffle=True,
-    num_workers=4,
-    pin_memory=True)
-val_loader = DataLoader(
-    dataset=data.SignalDataset(val_signal, val_quaketime, window_size),
-    batch_size=batch_size,
-    shuffle=False,
-    num_workers=4,
-    pin_memory=True)
+train_dataset = data.SignalDataset(train_signal, train_quaketime,
+                                   window_size=window_size,
+                                   overlap_size=overlap_size)
+val_dataset = data.SignalDataset(val_signal, val_quaketime,
+                                 window_size=window_size,
+                                 overlap_size=overlap_size)
 
-simple_net = models.BaselineNetOneChannel
-opt = optim.Adam(simple_net.parameters(), lr=1e-2)
+print('wave size:', train_dataset[0][0].size())
+
+train_loader = DataLoader(dataset=train_dataset,
+                          batch_size=batch_size,
+                          shuffle=True,
+                          num_workers=5,
+                          pin_memory=True)
+val_loader = DataLoader(dataset=val_dataset,
+                        batch_size=batch_size,
+                        shuffle=False,
+                        num_workers=5,
+                        pin_memory=True)
+
+model = models.BaselineNetRawSignal()
+opt = optim.Adam(model.parameters(), lr=1e-3)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
+log_writer = SummaryWriter(log_writer_path)
 
-utils.train_model(model=simple_net, optimizer=opt, lr_scheduler=lr_sched,
+utils.train_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
                   train_loader=train_loader, val_loader=val_loader,
-                  num_epochs=500, model_name=model_name, logs_path=logs_path)
+                  num_epochs=num_epochs, model_name=model_name,
+                  logs_path=logs_path, log_writer=log_writer)
