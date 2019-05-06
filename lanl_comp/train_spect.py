@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
+import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 # from torch.utils.data.sampler import BatchSampler # Sampler,
@@ -36,14 +37,14 @@ train_signal = train_signal[:val_start_idx]
 train_quaketime = train_quaketime[:val_start_idx]
 
 # training params
-model_name = 'spectr_net_v1_window5'
+model_name = 'spectr_net_v1_Huberloss'
 batch_size = 500  # 1300
 num_epochs = 3
 
-hz_cutoff = 0  # {0, ..., 600000, ...}
+hz_cutoff = 600000  # {0, ..., 600000, ...}
 window_size = 10000
 overlap_size = int(window_size * 0.5)  # window_size // 2
-nperseg = 64
+nperseg = 128
 
 logs_path = '/mntlong/lanl_comp/logs/'
 current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
@@ -72,9 +73,12 @@ val_loader = DataLoader(dataset=val_dataset,
                         pin_memory=True)
 
 # get modified resnet model
-model = tv_models.resnet18(pretrained=True)
-model = models.get_resnet(model)
 # model = models.BaselineNetSpect()
+model = tv_models.resnet50(pretrained=True)
+model = models.get_resnet(model)
+loss_fn = nn.SmoothL1Loss()  # nn.MSELoss()
+
+
 opt = optim.Adam(model.parameters(), lr=1e-3)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
 log_writer = SummaryWriter(log_writer_path)
@@ -82,4 +86,5 @@ log_writer = SummaryWriter(log_writer_path)
 utils.train_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
                   train_loader=train_loader, val_loader=val_loader,
                   num_epochs=num_epochs, model_name=model_name,
-                  logs_path=logs_path, log_writer=log_writer)
+                  logs_path=logs_path, log_writer=log_writer,
+                  loss_fn=loss_fn)

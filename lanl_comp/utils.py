@@ -30,7 +30,7 @@ def spectrogram(sig_in, nperseg):
 
 
 def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
-                num_epochs, model_name, logs_path, log_writer):  # loss_fn,
+                num_epochs, model_name, logs_path, log_writer, loss_fn):
     model = model.to(cuda)
     n_iter_train = 1
     for epoch in range(num_epochs):
@@ -44,7 +44,8 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
 
             optimizer.zero_grad()
             out = model.forward(x)
-            loss = F.l1_loss(out, target)
+            loss = loss_fn(out, target)
+            metrics = F.l1_loss(out, target)
 
             loss.backward()
             optimizer.step()
@@ -53,10 +54,14 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
             log_writer.add_scalars('loss',
                                    {'train_batch': loss.item()},
                                    n_iter_train)
+            log_writer.add_scalars('metrics_MAE',
+                                   {'train_batch': metrics.item()},
+                                   n_iter_train)
             n_iter_train += 1
 
         # validating process
         loss_val_batch = []
+        metrics_val_batch = []
         model.eval()
 
         # calculating loss
@@ -66,17 +71,23 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
                 target = target.to(cuda, non_blocking=True)
 
                 out = model.forward(x)
-                loss = F.l1_loss(out, target)
+                loss = loss_fn(out, target)
+                metrics = F.l1_loss(out, target)
 
                 loss_val_batch.append(loss.item())
+                metrics_val_batch.append(metrics.item())
 
         # change lr
         val_mean_loss = np.mean(loss_val_batch)
-        lr_scheduler.step(val_mean_loss)
+        val_mean_metrics = np.mean(metrics_val_batch)
+        lr_scheduler.step(val_mean_metrics)
 
         # logging
         log_writer.add_scalars('loss',
                                {'val_mean': val_mean_loss},
+                               n_iter_train - 1)
+        log_writer.add_scalars('metrics_MAE',
+                               {'val_mean': val_mean_metrics},
                                n_iter_train - 1)
         log_writer.add_scalar('lr',
                               optimizer.param_groups[0]['lr'],
@@ -89,7 +100,7 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'val_mean_loss': val_mean_loss,
-            # 'val_metrics': val_mean_roc_metrics
+            'val_mean_metrics': val_mean_metrics
         }, save_path)
 
         if epoch == 0:
@@ -104,5 +115,5 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'val_mean_loss': val_mean_loss,
-                    # 'val_metrics': val_mean_roc_metrics
+                    'val_mean_metrics': val_mean_metrics
                 }, save_path)
