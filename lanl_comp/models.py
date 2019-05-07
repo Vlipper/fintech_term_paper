@@ -2,33 +2,50 @@ from collections import OrderedDict
 import torch.nn as nn
 
 
-class BaselineNetRawSignal(nn.Module):
+class Flatten(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+
+class BaselineNetRawSignalV1(nn.Module):
     def __init__(self):
         super().__init__()
 
         self.body = nn.Sequential(
             nn.Conv1d(1, 16, 2, stride=1),
+            nn.BatchNorm1d(16),
             nn.ReLU(),
+            nn.MaxPool1d(3),
 
             nn.Conv1d(16, 16, 2, stride=2, dilation=1+1),
+            nn.BatchNorm1d(16),
             nn.ReLU(),
 
             nn.Conv1d(16, 16, 2, stride=2, dilation=1+2),
+            nn.BatchNorm1d(16),
             nn.ReLU(),
 
             nn.Conv1d(16, 32, 2, stride=2, dilation=1+4),
+            nn.BatchNorm1d(32),
             nn.ReLU(),
 
             nn.Conv1d(32, 32, 2, stride=2, dilation=1+8),
+            nn.BatchNorm1d(32),
             nn.ReLU(),
 
             nn.Conv1d(32, 64, 2, stride=2, dilation=1+16),
+            nn.BatchNorm1d(64),
             nn.ReLU(),
 
             nn.Conv1d(64, 64, 2, stride=2, dilation=1+32),
+            nn.BatchNorm1d(64),
             nn.ReLU(),
 
             nn.Conv1d(64, 128, 2, stride=2, dilation=1+64),
+            nn.BatchNorm1d(128),
             # nn.ReLU(),
 
             nn.AdaptiveAvgPool1d(1),
@@ -38,6 +55,57 @@ class BaselineNetRawSignal(nn.Module):
 
     def forward(self, inpt):
         return self.body(inpt)
+
+
+class BaselineNetRawSignalV2(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.body = nn.Sequential(
+            nn.Conv1d(1, 16, 2, stride=1),
+            nn.MaxPool1d(3),
+            nn.BatchNorm1d(16),
+            nn.Dropout(0.5),
+
+            nn.Conv1d(16, 16, 2, stride=2, dilation=1+1),
+            nn.Dropout(0.5),
+            nn.MaxPool1d(3),
+
+            nn.Conv1d(16, 16, 2, stride=2, dilation=1+2),
+            nn.Dropout(0.5),
+            nn.MaxPool1d(3),
+
+            nn.Conv1d(16, 32, 2, stride=2, dilation=1+4),
+            nn.Dropout(0.5),
+            nn.MaxPool1d(3),
+
+            nn.Conv1d(32, 64, 2, stride=2, dilation=1+8),
+            nn.Dropout(0.5),
+            nn.MaxPool1d(3),
+
+            # nn.Conv1d(64, 128, 2, stride=2, dilation=1+16),
+            # nn.Dropout(0.5),
+            # nn.MaxPool1d(3),
+            #
+            # nn.Conv1d(64, 64, 2, stride=2, dilation=1+32),
+            # nn.Dropout(0.5),
+            # nn.MaxPool1d(3),
+
+            # nn.Conv1d(64, 128, 2, stride=2, dilation=1+64),
+            # nn.Dropout(0.5),
+            # nn.MaxPool1d(3),
+            #
+            nn.AdaptiveAvgPool1d(1),
+            Flatten(),
+            nn.Linear(in_features=64, out_features=1, bias=True)
+        )
+
+    def forward(self, inpt):
+        return self.body(inpt)
+# import torch
+# model = BaselineNetRawSignalV2()
+# inpt = torch.rand(1, 1, 25000)
+# model(inpt).size()
 
 
 class BaselineNetSpect(nn.Module):
@@ -68,14 +136,6 @@ class BaselineNetSpect(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.head(x)
         return x
-
-
-class Flatten(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        return x.view(x.size(0), -1)
 
 
 def get_resnet(torchvision_resnet):

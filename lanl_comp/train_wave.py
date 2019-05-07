@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 import torch
+import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
@@ -38,12 +39,15 @@ train_signal = train_signal[:val_start_idx]
 train_quaketime = train_quaketime[:val_start_idx]
 
 # training params
-model_name = 'wave_net_v1_window5'
-batch_size = 900
-num_epochs = 50
+model_name = 'wave_net_v1_new2'
+batch_size = 250
+num_epochs = 100
 
-window_size = 25000
-overlap_size = int(window_size * 0.9)  # window_size // 2
+window_size = 150000
+overlap_size = int(window_size * 0.5)
+
+model = models.BaselineNetRawSignalV2()
+loss_fn = nn.SmoothL1Loss()  # L1Loss() SmoothL1Loss() MSELoss()
 
 logs_path = '/mntlong/lanl_comp/logs/'
 current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
@@ -61,15 +65,15 @@ print('wave size:', train_dataset[0][0].size())
 train_loader = DataLoader(dataset=train_dataset,
                           batch_size=batch_size,
                           shuffle=True,
-                          num_workers=5,
+                          num_workers=6,
                           pin_memory=True)
 val_loader = DataLoader(dataset=val_dataset,
                         batch_size=batch_size,
                         shuffle=False,
-                        num_workers=5,
+                        num_workers=6,
                         pin_memory=True)
 
-model = models.BaselineNetRawSignal()
+
 opt = optim.Adam(model.parameters(), lr=1e-3)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
 log_writer = SummaryWriter(log_writer_path)
@@ -77,4 +81,5 @@ log_writer = SummaryWriter(log_writer_path)
 utils.train_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
                   train_loader=train_loader, val_loader=val_loader,
                   num_epochs=num_epochs, model_name=model_name,
-                  logs_path=logs_path, log_writer=log_writer)
+                  logs_path=logs_path, log_writer=log_writer,
+                  loss_fn=loss_fn)
