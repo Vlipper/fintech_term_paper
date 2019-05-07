@@ -38,13 +38,19 @@ train_quaketime = train_quaketime[:val_start_idx]
 
 # training params
 model_name = 'spectr_net_v1_Huberloss'
-batch_size = 500  # 1300
-num_epochs = 3
+batch_size = 50  # 1300
+num_epochs = 5
 
 hz_cutoff = 600000  # {0, ..., 600000, ...}
-window_size = 10000
-overlap_size = int(window_size * 0.5)  # window_size // 2
-nperseg = 128
+window_size = 150000
+overlap_size = int(window_size * 0.0)
+nperseg = 2048
+
+# get modified resnet model
+# model = models.BaselineNetSpect()
+model = tv_models.resnet50(pretrained=True)
+model = models.get_resnet(model)
+loss_fn = nn.SmoothL1Loss()  # nn.MSELoss()
 
 logs_path = '/mntlong/lanl_comp/logs/'
 current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
@@ -71,13 +77,6 @@ val_loader = DataLoader(dataset=val_dataset,
                         shuffle=False,
                         num_workers=5,
                         pin_memory=True)
-
-# get modified resnet model
-# model = models.BaselineNetSpect()
-model = tv_models.resnet50(pretrained=True)
-model = models.get_resnet(model)
-loss_fn = nn.SmoothL1Loss()  # nn.MSELoss()
-
 
 opt = optim.Adam(model.parameters(), lr=1e-3)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)

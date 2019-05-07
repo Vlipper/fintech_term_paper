@@ -1,4 +1,5 @@
 ToDo:
+- Чуть переделать валидацию, чтобы было полное соответствие тесту: 150к наблюдений, таргет -- последнее значение
 - 
 
 
@@ -19,7 +20,7 @@ General:
 
 Commands:
 - cd /mntlong/lanl_comp/lanl_comp/
-- python3.7 train_spect.py
+- python3.7 train_
 - tensorboard --logdir /mntlong/lanl_comp/logs/runs/
 - ssh -N -f -L 6006:localhost:6006 168.62.161.216
 

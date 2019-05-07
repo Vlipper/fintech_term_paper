@@ -22,7 +22,13 @@ def test_inference(model, data_loader):
             x = x.to(cuda, non_blocking=True).float()
 
             out = model.forward(x)
-            preds.extend(out.squeeze().to(cpu).tolist())
+            out = out.squeeze().to(cpu).tolist()
+            if isinstance(out, list):
+                preds.extend(out)
+            elif isinstance(out, float):
+                preds.append(out)
+            else:
+                raise Exception('out is not float or list')
     return preds
 
 
@@ -39,14 +45,14 @@ model.eval()
 data_path = '/mntlong/lanl_comp/data/'
 test_data_path = data_path + 'test/'
 test_names = os.listdir(test_data_path)
-# test_names = test_names[:50]
+test_names = test_names[:50]
 
 batch_size = 500  # 1300
 
 hz_cutoff = 600000  # {0, ..., 600000, ...}
-window_size = 10000
-overlap_size = int(window_size * 0.5)  # window_size // 2
-nperseg = 128
+window_size = 150000
+overlap_size = int(window_size * 0.0)
+nperseg = 2048
 
 for wave_num, test_wave in enumerate(tqdm(test_names,
                                           desc='test inference',
