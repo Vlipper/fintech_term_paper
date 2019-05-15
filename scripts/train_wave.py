@@ -1,9 +1,10 @@
+import os
 from datetime import datetime
 
 import pandas as pd
 import numpy as np
 
-import torch
+# import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -16,9 +17,11 @@ import utils
 
 
 # load train data into ram
-source_path = '/mntlong/lanl_comp/data/'
-train_info_path = source_path + 'train_info.csv'
-train_data_path = source_path + 'train_compressed.npz'
+# data_path = '/mntlong/scripts/data/'
+file_dir = os.path.dirname(__file__)
+data_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'data'))
+train_info_path = data_path + 'train_info.csv'
+train_data_path = data_path + 'train_compressed.npz'
 
 train_info = pd.read_csv(train_info_path, index_col='Unnamed: 0')
 train_info['exp_len'] = train_info['indx_end'] - train_info['indx_start']
@@ -26,8 +29,8 @@ train_info['exp_len'] = train_info['indx_end'] - train_info['indx_start']
 train_signal = np.load(train_data_path)['signal']
 train_quaketime = np.load(train_data_path)['quake_time']
 
-train_signal = torch.from_numpy(train_signal)
-train_quaketime = torch.from_numpy(train_quaketime)
+# train_signal = torch.from_numpy(train_signal)
+# train_quaketime = torch.from_numpy(train_quaketime)
 
 # В валидацию берем 2 последних волны (части эксперимента)
 val_start_idx = train_info.iloc[-2, :]['indx_start']
@@ -39,17 +42,20 @@ train_signal = train_signal[:val_start_idx]
 train_quaketime = train_quaketime[:val_start_idx]
 
 # training params
-model_name = 'wave_net_v1_new2'
-batch_size = 250
-num_epochs = 100
+model_name = 'wave_net_v1_cnn_rnn'
+batch_size = 200
+num_epochs = 10
 
 window_size = 150000
 overlap_size = int(window_size * 0.5)
 
-model = models.BaselineNetRawSignalV2()
+model = models.BaselineNetRawSignalCnnRnnV1()
 loss_fn = nn.SmoothL1Loss()  # L1Loss() SmoothL1Loss() MSELoss()
+opt = optim.Adam(model.parameters(), lr=1e-3)  # weight_decay=0.1
+# opt = optim.SGD(model.parameters(), lr=1e-3, momentum=0.5, weight_decay=0.1)
 
-logs_path = '/mntlong/lanl_comp/logs/'
+# logs_path = '/mntlong/scripts/logs/'
+logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
 current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
 log_writer_path = logs_path + 'runs/' + current_datetime + '_' + model_name
 
@@ -73,8 +79,6 @@ val_loader = DataLoader(dataset=val_dataset,
                         num_workers=6,
                         pin_memory=True)
 
-
-opt = optim.Adam(model.parameters(), lr=1e-3)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
 log_writer = SummaryWriter(log_writer_path)
 

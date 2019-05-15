@@ -32,22 +32,21 @@ def test_inference(model, data_loader):
     return preds
 
 
-# model = models.BaselineNetSpect()
 model = tv_models.resnet50(pretrained=False)
 model = models.get_resnet(model)
-model_name = 'spectr_net_v1_Huberloss_best_state.pth'  # _best_state, _last_state
+model_name = 'wave_net_v1_new3_best_state.pth'  # _best_state, _last_state
 
-model_path = '/mntlong/lanl_comp/logs/' + model_name
+model_path = '/mntlong/scripts/logs/' + model_name
 model.load_state_dict(torch.load(model_path)['model_state_dict'])
 model = model.to(cuda)
 model.eval()
 
-data_path = '/mntlong/lanl_comp/data/'
+data_path = '/mntlong/scripts/data/'
 test_data_path = data_path + 'test/'
 test_names = os.listdir(test_data_path)
 test_names = test_names[:50]
 
-batch_size = 500  # 1300
+batch_size = 100  # 1300
 
 hz_cutoff = 600000  # {0, ..., 600000, ...}
 window_size = 150000

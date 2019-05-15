@@ -1,3 +1,4 @@
+import os
 from tqdm import tqdm
 import numpy as np
 from scipy import signal
@@ -57,14 +58,25 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
             log_writer.add_scalars('metrics_MAE',
                                    {'train_batch': metrics.item()},
                                    n_iter_train)
+
+            # grads norms
+            # grads_norms = {}
+            # num_layer = 0
+            # for name, param in model.named_parameters():
+            #     if param.requires_grad and 'bias' not in name:
+            #         grads_norms['grad_w' + str(100 + num_layer)[1:]] = \
+            #             torch.norm(param.grad).item()
+            #         num_layer += 1
+            # log_writer.add_scalars('gradients_norms',
+            #                        grads_norms,
+            #                        n_iter_train)
+
             n_iter_train += 1
 
         # validating process
+        model.eval()
         loss_val_batch = []
         metrics_val_batch = []
-        model.eval()
-
-        # calculating loss
         for x, target in tqdm(val_loader, desc='validation', position=0):
             with torch.no_grad():
                 x = x.to(cuda, non_blocking=True).float()
@@ -93,8 +105,8 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
                               optimizer.param_groups[0]['lr'],
                               n_iter_train - 1)
 
-        # saving model (make generator to save N last epochs)
-        save_path = logs_path + model_name + '_last_state.pth'
+        # saving model TODO: make generator to save N last epochs
+        save_path = os.path.join(logs_path, model_name + '_last_state.pth')
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
@@ -109,7 +121,7 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
             if val_mean_loss < best_val_mean_loss:
                 best_val_mean_loss = val_mean_loss
 
-                save_path = logs_path + model_name + '_best_state.pth'
+                save_path = os.path.join(logs_path, model_name + '_best_state.pth')
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),

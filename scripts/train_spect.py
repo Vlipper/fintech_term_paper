@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 import pandas as pd
@@ -17,9 +18,11 @@ import utils
 
 
 # load train data into ram
-source_path = '/mntlong/lanl_comp/data/'
-train_info_path = source_path + 'train_info.csv'
-train_data_path = source_path + 'train_compressed.npz'
+# data_path = '/mntlong/lanl_comp/data/'
+file_dir = os.path.dirname(__file__)
+data_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'data'))
+train_info_path = os.path.join(data_path, 'train_info.csv')
+train_data_path = os.path.join(data_path, 'train_compressed.npz')
 
 train_info = pd.read_csv(train_info_path, index_col='Unnamed: 0')
 train_info['exp_len'] = train_info['indx_end'] - train_info['indx_start']
@@ -52,9 +55,11 @@ model = tv_models.resnet50(pretrained=True)
 model = models.get_resnet(model)
 loss_fn = nn.SmoothL1Loss()  # nn.MSELoss()
 
-logs_path = '/mntlong/lanl_comp/logs/'
+# logs_path = '/mntlong/lanl_comp/logs/'
+logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
 current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
-log_writer_path = logs_path + 'runs/' + current_datetime + '_' + model_name
+log_writer_path = os.path.join(logs_path, 'runs/',
+                               current_datetime + '_' + model_name)
 
 train_dataset = data.SpectrogramDataset(train_signal, train_quaketime,
                                         hz_cutoff=hz_cutoff, window_size=window_size,

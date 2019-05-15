@@ -1,5 +1,3 @@
-# import numpy as np
-# import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import utils
@@ -24,7 +22,13 @@ class SignalDataset(Dataset):
 
     def __getitem__(self, index):
         start_idx, end_idx = self.boarder_points[index]
-        return self.signal[start_idx:end_idx].view(1, -1), self.target[end_idx - 1]
+        signal = torch.from_numpy(self.signal[start_idx:end_idx])
+
+        if self.target is not None:
+            target = torch.tensor(self.target[end_idx - 1])
+            return signal.view(1, -1), target
+        else:
+            return signal.view(1, -1)
 
 
 # spectrogram dataset
@@ -42,9 +46,6 @@ class SpectrogramDataset(Dataset):
         self.nperseg = nperseg
 
         # make borders for every example
-        # self.boarder_points = [(i * exmpl_size, (i + 1) * exmpl_size)
-        #                        for i in range(signal.shape[0] // exmpl_size + 1)]
-        # self.boarder_points = self.boarder_points[:-1]
         wave_size = signal.shape[0]
         self.boarder_points = [(i, i + window_size)
                                for i in range(0, wave_size, window_size - overlap_size)
@@ -67,7 +68,5 @@ class SpectrogramDataset(Dataset):
         if self.target is not None:
             target = torch.tensor(self.target[end_idx - 1])
             return spec.view(1, spec.size(0), -1), target
-            # return spec.expand(3, -1, -1), target
         else:
             return spec.view(1, spec.size(0), -1)
-            # return spec.expand(3, -1, -1)
