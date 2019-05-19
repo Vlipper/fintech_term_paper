@@ -19,7 +19,7 @@ General:
 - источники от LANL: https://scholar.google.fr/citations?user=TDnMb_QAAAAJ&hl=en
 
 Commands:
-- cd /mntlong/lanl_comp/lanl_comp/
+- cd /mntlong/lanl_comp/scripts/
 - python3.7 train_
 - tensorboard --logdir /mntlong/lanl_comp/logs/runs/
 - ssh -N -f -L 6006:localhost:6006 168.62.161.216

@@ -58,8 +58,7 @@ loss_fn = nn.SmoothL1Loss()  # nn.MSELoss()
 # logs_path = '/mntlong/lanl_comp/logs/'
 logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
 current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
-log_writer_path = os.path.join(logs_path, 'runs/',
-                               current_datetime + '_' + model_name)
+log_writer_path = os.path.join(logs_path, 'runs', current_datetime + '_' + model_name)
 
 train_dataset = data.SpectrogramDataset(train_signal, train_quaketime,
                                         hz_cutoff=hz_cutoff, window_size=window_size,

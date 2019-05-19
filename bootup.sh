@@ -5,4 +5,4 @@ set -e
 tmux new -d -s tensorboard 'tensorboard --logdir /mntlong/lanl_comp/logs/runs/'
 
 # make train ready session
-tmux new -d -s train && tmux send-keys -t train C-z 'cd /mntlong/lanl_comp/lanl_comp/' Enter && tmux a -t train
+tmux new -d -s train && tmux send-keys -t train C-z 'cd /mntlong/scripts/lanl_comp/' Enter && tmux a -t train
