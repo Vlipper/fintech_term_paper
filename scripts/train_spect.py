@@ -1,4 +1,5 @@
 import os
+os.environ['MKL_NUM_THREADS'] = '1'
 from datetime import datetime
 
 import pandas as pd
@@ -40,34 +41,36 @@ train_signal = train_signal[:val_start_idx]
 train_quaketime = train_quaketime[:val_start_idx]
 
 # training params
-model_name = 'spectr_net_v1_Huberloss'
-batch_size = 50  # 1300
+model_name = 'spectr_net_v1'
+batch_size = 100  # 1300
 num_epochs = 5
 
 hz_cutoff = 600000  # {0, ..., 600000, ...}
 window_size = 150000
-overlap_size = int(window_size * 0.0)
+overlap_size = int(window_size * 0.5)
 nperseg = 2048
+
+num_bins = 17
 
 # get modified resnet model
 # model = models.BaselineNetSpect()
-model = tv_models.resnet50(pretrained=True)
-model = models.get_resnet(model)
-loss_fn = nn.SmoothL1Loss()  # nn.MSELoss()
+model = tv_models.resnet34(pretrained=True)
+model = models.get_resnet(model, out_size=16)
+loss_fn = nn.CrossEntropyLoss()
 
 # logs_path = '/mntlong/lanl_comp/logs/'
 logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
 current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
 log_writer_path = os.path.join(logs_path, 'runs', current_datetime + '_' + model_name)
 
-train_dataset = data.SpectrogramDataset(train_signal, train_quaketime,
+train_dataset = data.SpectrogramDataset(train_signal, train_quaketime, num_bins=num_bins,
+                                        idxs_wave_end=train_info['indx_end'].values,
                                         hz_cutoff=hz_cutoff, window_size=window_size,
-                                        overlap_size=overlap_size,
-                                        nperseg=nperseg)
-val_dataset = data.SpectrogramDataset(val_signal, val_quaketime,
+                                        overlap_size=overlap_size, nperseg=nperseg)
+val_dataset = data.SpectrogramDataset(val_signal, val_quaketime, num_bins=num_bins,
+                                      idxs_wave_end=train_info['indx_end'].values,
                                       hz_cutoff=hz_cutoff, window_size=window_size,
-                                      overlap_size=overlap_size,
-                                      nperseg=nperseg)
+                                      overlap_size=overlap_size, nperseg=nperseg)
 
 print('spectrogram size:', train_dataset[0][0].size())
 
@@ -82,12 +85,12 @@ val_loader = DataLoader(dataset=val_dataset,
                         num_workers=5,
                         pin_memory=True)
 
-opt = optim.Adam(model.parameters(), lr=1e-3)
+opt = optim.Adam(model.parameters(), lr=3e-4)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
 log_writer = SummaryWriter(log_writer_path)
 
-utils.train_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
-                  train_loader=train_loader, val_loader=val_loader,
-                  num_epochs=num_epochs, model_name=model_name,
-                  logs_path=logs_path, log_writer=log_writer,
-                  loss_fn=loss_fn)
+utils.train_spec_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
+                       train_loader=train_loader, val_loader=val_loader,
+                       num_epochs=num_epochs, model_name=model_name,
+                       logs_path=logs_path, log_writer=log_writer,
+                       loss_fn=loss_fn, num_bins=num_bins)

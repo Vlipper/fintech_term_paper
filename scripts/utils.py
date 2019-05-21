@@ -20,7 +20,7 @@ def spectrogram(sig_in, nperseg):
     nperseg = nperseg  # default 256 -- размер окна
     noverlap = nperseg // 8
     fs = 4 * 1e+6  # raw signal sample rate is 4MHz
-    window = 'hamming'  # {triang, hamming}
+    window = 'hann'  # {triang, hamming}
     detrend = 'linear'  # {'linear', 'constant', False}
     scaling = 'density'  # {'density', 'spectrum'}
     eps = 1e-11
@@ -30,26 +30,48 @@ def spectrogram(sig_in, nperseg):
     return f, t, np.log(Sxx + eps)
 
 
-def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
-                num_epochs, model_name, logs_path, log_writer, loss_fn):
+def other_wave_check(right_boarder, first_wave_windows):
+    for next_wave_start, next_wave_end in first_wave_windows:
+        if next_wave_start < right_boarder < next_wave_end:
+            return False
+    return True
+
+
+def left_padding(row, needed_len):
+    pad_size = needed_len - len(row)
+    pad = np.zeros(pad_size)
+    row_padded = np.concatenate((pad, row))
+
+    return row_padded
+
+
+def train_spec_model(model, optimizer, lr_scheduler, train_loader, val_loader,
+                     num_epochs, model_name, logs_path, log_writer, loss_fn,
+                     num_bins):
     model = model.to(cuda)
+    torch_bins = torch.linspace(0, 16.11, num_bins, dtype=torch.float32)
     n_iter_train = 1
     for epoch in range(num_epochs):
         # training process
         model.train()
-        for x, target in tqdm(train_loader,
-                              desc='training, epoch={}'.format(epoch + 1),
-                              position=0):
-            x = x.to(cuda, non_blocking=True).float()
-            target = target.to(cuda, non_blocking=True)
+        for x, target, target_bin in tqdm(train_loader,
+                                          desc='training, epoch={}'.format(epoch + 1),
+                                          position=0):
+            x = x.to(device=cuda, dtype=torch.float32, non_blocking=True)
+            target = target.to(device=cuda, non_blocking=True)
+            target_bin = target_bin.to(device=cuda, non_blocking=True)
 
             optimizer.zero_grad()
             out = model.forward(x)
-            loss = loss_fn(out, target)
-            metrics = F.l1_loss(out, target)
-
+            loss = loss_fn(out, target_bin)
             loss.backward()
             optimizer.step()
+
+            # calc metrics
+            max_out = torch.argmax(out, 1)
+            bin_centroids = (torch_bins[max_out] + torch_bins[max_out + 1]) / 2
+            bin_centroids = bin_centroids.to(device=cuda, non_blocking=True)
+            metrics = F.l1_loss(bin_centroids, target)
 
             # logging
             log_writer.add_scalars('loss',
@@ -77,14 +99,20 @@ def train_model(model, optimizer, lr_scheduler, train_loader, val_loader,
         model.eval()
         loss_val_batch = []
         metrics_val_batch = []
-        for x, target in tqdm(val_loader, desc='validation', position=0):
+        for x, target, target_bin in tqdm(val_loader, desc='validation', position=0):
             with torch.no_grad():
-                x = x.to(cuda, non_blocking=True).float()
-                target = target.to(cuda, non_blocking=True)
+                x = x.to(device=cuda, dtype=torch.float32, non_blocking=True)
+                target = target.to(device=cuda, non_blocking=True)
+                target_bin = target_bin.to(device=cuda, non_blocking=True)
 
                 out = model.forward(x)
-                loss = loss_fn(out, target)
-                metrics = F.l1_loss(out, target)
+                loss = loss_fn(out, target_bin)
+
+                # calc metrics
+                max_out = torch.argmax(out, 1)
+                bin_centroids = (torch_bins[max_out] + torch_bins[max_out + 1]) / 2
+                bin_centroids = bin_centroids.to(device=cuda, non_blocking=True)
+                metrics = F.l1_loss(bin_centroids, target)
 
                 loss_val_batch.append(loss.item())
                 metrics_val_batch.append(metrics.item())

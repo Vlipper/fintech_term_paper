@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 import utils
@@ -5,17 +6,23 @@ import utils
 
 # signal dataset
 class SignalDataset(Dataset):
-    def __init__(self, signal, target, window_size=10000, overlap_size=5000):
+    def __init__(self, signal, target, idxs_wave_end,
+                 window_size=10000, overlap_size=5000):
         super().__init__()
 
         self.signal = signal
         self.target = target
 
         # make borders for every example
+        #  and exclude borders which include different waves
+        next_wave_windows = [(i, i + window_size) for i in idxs_wave_end]
         wave_size = signal.shape[0]
         self.boarder_points = [(i, i + window_size)
-                               for i in range(0, wave_size, window_size - overlap_size)
-                               if i + window_size <= wave_size]
+                               for i in range(0, wave_size,
+                                              window_size - overlap_size)
+                               if i + window_size <= wave_size
+                               and utils.other_wave_check(i + window_size,
+                                                          next_wave_windows)]
 
     def __len__(self):
         return len(self.boarder_points)
@@ -33,9 +40,8 @@ class SignalDataset(Dataset):
 
 # spectrogram dataset
 class SpectrogramDataset(Dataset):
-    def __init__(self, signal, target=None, hz_cutoff=600000,
-                 window_size=10000, overlap_size=5000,
-                 nperseg=256):
+    def __init__(self, signal, target, idxs_wave_end, num_bins,
+                 hz_cutoff=600000, window_size=10000, overlap_size=5000, nperseg=256):
         super().__init__()
 
         self.signal = signal
@@ -46,10 +52,19 @@ class SpectrogramDataset(Dataset):
         self.nperseg = nperseg
 
         # make borders for every example
+        #  and exclude borders which include different waves
+        next_wave_windows = [(i, i + window_size) for i in idxs_wave_end]
         wave_size = signal.shape[0]
         self.boarder_points = [(i, i + window_size)
                                for i in range(0, wave_size, window_size - overlap_size)
-                               if i + window_size <= wave_size]
+                               if i + window_size <= wave_size
+                               and utils.other_wave_check(i + window_size,
+                                                          next_wave_windows)]
+
+        # split target on bins
+        if target is not None:
+            bins = np.linspace(0, 16.11, num_bins)
+            self.target_bins = np.digitize(target, bins) - 1
 
     def __len__(self):
         return len(self.boarder_points)
@@ -67,6 +82,7 @@ class SpectrogramDataset(Dataset):
 
         if self.target is not None:
             target = torch.tensor(self.target[end_idx - 1])
-            return spec.view(1, spec.size(0), -1), target
+            target_bin = torch.tensor(self.target_bins[end_idx - 1])
+            return spec.view(1, spec.size(0), -1), target, target_bin
         else:
             return spec.view(1, spec.size(0), -1)

@@ -101,15 +101,15 @@ class BaselineNetRawSignalV3(nn.Module):
         super().__init__()
 
         self.body = nn.Sequential(
-            nn.Conv1d(1, 32, 10, stride=1),
+            nn.Conv1d(1, 32, 10, stride=1, bias=False),
             nn.ReLU(),
 
             nn.MaxPool1d(100),
 
-            nn.Conv1d(32, 64, 10, stride=1),
+            nn.Conv1d(32, 64, 10, stride=1, bias=False),
             nn.ReLU(),
 
-            nn.Conv1d(64, 128, 10, stride=1),
+            nn.Conv1d(64, 128, 10, stride=1, bias=False),
             nn.ReLU(),
 
             nn.AdaptiveAvgPool1d(1),
@@ -320,7 +320,7 @@ class BaselineNetSpect(nn.Module):
         return x
 
 
-def get_resnet(torchvision_resnet):
+def get_resnet(torchvision_resnet, out_size):
     modules = [*torchvision_resnet.named_children()]
 
     # layers modification
@@ -330,7 +330,7 @@ def get_resnet(torchvision_resnet):
                                  padding=(3, 3), bias=False)
     del modules['maxpool']
     modules['fc'] = nn.Linear(in_features=modules['fc'].in_features,
-                              out_features=1,
+                              out_features=out_size,
                               bias=True)
 
     resnet_mod = nn.Sequential(modules)

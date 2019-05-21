@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 
 # data_path = './data/train/train.csv'
@@ -9,10 +10,10 @@ data_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'data'))
 
 # load source csv to pandas
 chunks = []
-for chunk in pd.read_csv(os.path.join(data_path, 'train.csv'),
-                         chunksize=10 ** 6, low_memory=False,  # nrows=10**7 * 30,
-                         dtype={'acoustic_data': np.int16,
-                                'time_to_failure': np.float32}):  # np.float64
+for chunk in tqdm(pd.read_csv(os.path.join(data_path, 'train.csv'),
+                              chunksize=10 ** 6, low_memory=False,  # nrows=10**7 * 30,
+                              dtype={'acoustic_data': np.int16,
+                              'time_to_failure': np.float32})):  # np.float64
     chunks.append(chunk)
 train_source = pd.concat(chunks)
 train_source.columns = ['signal', 'quake_time']
