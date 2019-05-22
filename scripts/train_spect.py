@@ -1,5 +1,5 @@
 import os
-os.environ['MKL_NUM_THREADS'] = '1'
+# os.environ['MKL_NUM_THREADS'] = '1'
 from datetime import datetime
 
 import pandas as pd
@@ -55,7 +55,7 @@ num_bins = 17
 # get modified resnet model
 # model = models.BaselineNetSpect()
 model = tv_models.resnet34(pretrained=True)
-model = models.get_resnet(model, out_size=16)
+model = models.get_resnet(model, out_size=num_bins-1)
 loss_fn = nn.CrossEntropyLoss()
 
 # logs_path = '/mntlong/lanl_comp/logs/'

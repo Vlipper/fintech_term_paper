@@ -37,6 +37,12 @@ def other_wave_check(right_boarder, first_wave_windows):
     return True
 
 
+def bin_to_target(net_out, bins):
+    max_out = torch.argmax(net_out, 1)
+    bin_centroids = (bins[max_out] + bins[max_out + 1]) / 2
+    return bin_centroids
+
+
 def left_padding(row, needed_len):
     pad_size = needed_len - len(row)
     pad = np.zeros(pad_size)
