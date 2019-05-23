@@ -11,7 +11,7 @@ class Flatten(nn.Module):
 
 
 class BaselineNetRawSignalV1(nn.Module):
-    def __init__(self):
+    def __init__(self, out_size):
         super().__init__()
 
         self.body = nn.Sequential(
@@ -50,7 +50,7 @@ class BaselineNetRawSignalV1(nn.Module):
 
             nn.AdaptiveAvgPool1d(1),
             Flatten(),
-            nn.Linear(in_features=128, out_features=1, bias=True)
+            nn.Linear(in_features=128, out_features=out_size, bias=True)
         )
 
     def forward(self, inpt):
@@ -58,7 +58,7 @@ class BaselineNetRawSignalV1(nn.Module):
 
 
 class BaselineNetRawSignalV2(nn.Module):
-    def __init__(self):
+    def __init__(self, out_size):
         super().__init__()
 
         self.body = nn.Sequential(
@@ -89,7 +89,7 @@ class BaselineNetRawSignalV2(nn.Module):
 
             nn.AdaptiveAvgPool1d(1),
             Flatten(),
-            nn.Linear(in_features=64, out_features=1, bias=True)
+            nn.Linear(in_features=64, out_features=out_size, bias=True)
         )
 
     def forward(self, inpt):
@@ -97,7 +97,7 @@ class BaselineNetRawSignalV2(nn.Module):
 
 
 class BaselineNetRawSignalV3(nn.Module):
-    def __init__(self):
+    def __init__(self, out_size):
         super().__init__()
 
         self.body = nn.Sequential(
@@ -118,7 +118,7 @@ class BaselineNetRawSignalV3(nn.Module):
             nn.Linear(in_features=128, out_features=32, bias=True),
             nn.ReLU(),
 
-            nn.Linear(in_features=32, out_features=1, bias=True)
+            nn.Linear(in_features=32, out_features=out_size, bias=True)
         )
 
     def forward(self, inpt):
@@ -126,7 +126,7 @@ class BaselineNetRawSignalV3(nn.Module):
 
 
 class BaselineNetRawSignalV4(nn.Module):
-    def __init__(self):
+    def __init__(self, out_size):
         super().__init__()
 
         self.body = nn.Sequential(
@@ -169,7 +169,7 @@ class BaselineNetRawSignalV4(nn.Module):
             nn.AdaptiveAvgPool1d(1),
             Flatten(),
 
-            nn.Linear(in_features=512, out_features=1, bias=True)
+            nn.Linear(in_features=512, out_features=out_size, bias=True)
         )
 
     def forward(self, inpt):
@@ -177,7 +177,7 @@ class BaselineNetRawSignalV4(nn.Module):
 
 
 class BaselineNetRawSignalV5(nn.Module):
-    def __init__(self):
+    def __init__(self, out_size):
         super().__init__()
 
         self.input = nn.Sequential(nn.Conv1d(1, 64, 4000, stride=10, bias=False),
@@ -201,7 +201,7 @@ class BaselineNetRawSignalV5(nn.Module):
 
         self.output = nn.Sequential(nn.AdaptiveAvgPool1d(1),
                                     Flatten(),
-                                    nn.Linear(in_features=256, out_features=1, bias=True))
+                                    nn.Linear(in_features=256, out_features=out_size, bias=True))
 
         self.relu = nn.ReLU()
 
@@ -228,7 +228,7 @@ class BaselineNetRawSignalV5(nn.Module):
 
 
 class BaselineNetRawSignalCnnRnnV1(nn.Module):
-    def __init__(self):
+    def __init__(self, out_size):
         super().__init__()
 
         self.cnn = nn.Sequential(
@@ -277,13 +277,15 @@ class BaselineNetRawSignalCnnRnnV1(nn.Module):
         self.rnn = nn.LSTM(input_size=256, hidden_size=512, num_layers=10,
                            batch_first=True)
 
-        self.fc = nn.Linear(in_features=512, out_features=1, bias=True)
+        self.fc = nn.Linear(in_features=512, out_features=out_size, bias=True)
 
     def forward(self, inpt):
         out = self.cnn(inpt)
 
         out = out.view(-1, 1, 256)
         out = self.rnn(out)[0]
+        # out = out.view(-1, 512)
+        out = out.squeeze(1)
 
         out = self.fc(out)
         return out

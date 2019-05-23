@@ -1,5 +1,7 @@
 import os
 from tqdm import tqdm
+import subprocess
+import time
 
 import numpy as np
 import pandas as pd
@@ -18,7 +20,7 @@ def test_inference(model, data_loader):
     preds = []
     for x in data_loader:
         with torch.no_grad():
-            x = x.to(cuda, non_blocking=True).float()
+            x = x.to(device=cuda, dtype=torch.float32, non_blocking=True)
 
             out = model.forward(x)
             out = out.squeeze().to(cpu).tolist()
@@ -31,18 +33,24 @@ def test_inference(model, data_loader):
     return preds
 
 
-model = models.BaselineNetRawSignalV3()
-model_name = 'wave_net_v1_new3_best_state.pth'  # _best_state, _last_state
+num_bins = 17  # 17
 
-model_path = '/mntlong/scripts/logs/' + model_name
+model = models.BaselineNetRawSignalCnnRnnV1(out_size=num_bins-1)
+model_name = 'wave_net_v1_clf_rnn_v1' + '_best_state.pth'  # _best_state, _last_state
+
+# model_path = '/mntlong/lanl_comp/logs/' + model_name
+file_dir = os.path.dirname(__file__)
+logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
+model_path = os.path.join(logs_path, model_name)
 model.load_state_dict(torch.load(model_path)['model_state_dict'])
 model = model.to(cuda)
 model.eval()
 
-data_path = '/mntlong/scripts/data/'
-test_data_path = data_path + 'test/'
+# test_data_path = '/mntlong/lanl_comp/data/test/'
+data_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'data'))
+test_data_path = os.path.join(data_path, 'test')
 test_names = os.listdir(test_data_path)
-test_names = test_names[:200]
+# test_names = test_names[:200]
 
 batch_size = 50  # 1300
 
@@ -52,10 +60,12 @@ overlap_size = int(window_size * 0.0)
 for wave_num, test_wave in enumerate(tqdm(test_names,
                                           desc='test inference',
                                           position=0)):
-    wave_data = np.loadtxt(test_data_path + test_wave,
+    wave_data = np.loadtxt(os.path.join(test_data_path, test_wave),
                            dtype=np.float32, skiprows=1)
 
     test_dataset = data.SignalDataset(wave_data, target=None,
+                                      idxs_wave_end=[1500000],
+                                      num_bins=None,
                                       window_size=window_size,
                                       overlap_size=overlap_size)
 
@@ -70,11 +80,36 @@ for wave_num, test_wave in enumerate(tqdm(test_names,
         preds_mtrx = np.array([]).reshape(0, len(preds))
     preds_mtrx = np.vstack((preds_mtrx, preds))
 
-print('preds_mtrx mean and std: {:.4f}, {:.4f}'\
-      .format(np.mean(preds_mtrx), np.std(preds_mtrx)))
+max_preds = np.argmax(preds_mtrx, 1)
+bins = np.linspace(0, 16.11, num_bins)
+bin_centroids = (bins[max_preds] + bins[max_preds + 1]) / 2
+
+# print('preds_mtrx size, mean and std: {}, {:.4f}, {:.4f}'
+#       .format(preds_mtrx.shape, np.mean(preds_mtrx), np.std(preds_mtrx)))
 
 # preds_out = preds_mtrx[:, -1]
-#
-# submit = pd.read_csv(data_path + 'sample_submission.csv')
-# submit.loc[:, 'time_to_failure'] = preds_out
-# submit.to_csv('sub_' + model_name[:-15] + '.csv', index=False)
+preds_out = bin_centroids
+
+submit = pd.read_csv(os.path.join(data_path, 'sample_submission.csv'))  # , nrows=50
+submit.loc[:, 'time_to_failure'] = preds_out
+
+subs_path = os.path.join(data_path, 'subs')
+try:
+    os.mkdir(subs_path)
+except FileExistsError:
+    pass
+submit_path = os.path.join(subs_path, 'sub_' + model_name[:-15] + '.csv',)
+submit.to_csv(submit_path, index=False)
+
+# submit to kaggle
+submit_command = "kaggle competitions submit -c LANL-Earthquake-Prediction " \
+                 "-f {} -m 'cnn_rnn_val-1.609'".format(submit_path)
+if subprocess.run(submit_command, shell=True).returncode == 0:
+    print('\n', 'wait 20 sec. for results')
+    time.sleep(20)
+else:
+    raise Exception('submit was not done')
+
+print('Submissions info')
+subprocess.run('kaggle competitions submissions -c LANL-Earthquake-Prediction',
+               shell=True)

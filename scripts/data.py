@@ -6,7 +6,7 @@ import utils
 
 # signal dataset
 class SignalDataset(Dataset):
-    def __init__(self, signal, target, idxs_wave_end,
+    def __init__(self, signal, target, idxs_wave_end, num_bins,
                  window_size=10000, overlap_size=5000):
         super().__init__()
 
@@ -24,6 +24,11 @@ class SignalDataset(Dataset):
                                and utils.other_wave_check(i + window_size,
                                                           next_wave_windows)]
 
+        # split target on bins
+        if target is not None:
+            bins = np.linspace(0, 16.11, num_bins)
+            self.target_bins = np.digitize(target, bins) - 1
+
     def __len__(self):
         return len(self.boarder_points)
 
@@ -31,9 +36,12 @@ class SignalDataset(Dataset):
         start_idx, end_idx = self.boarder_points[index]
         signal = torch.from_numpy(self.signal[start_idx:end_idx])
 
+        signal = (signal - 4.5195) / 10.7357
+
         if self.target is not None:
             target = torch.tensor(self.target[end_idx - 1])
-            return signal.view(1, -1), target
+            target_bin = torch.tensor(self.target_bins[end_idx - 1])
+            return signal.view(1, -1), target, target_bin
         else:
             return signal.view(1, -1)
 
@@ -76,7 +84,11 @@ class SpectrogramDataset(Dataset):
 
         if self.hz_cutoff:
             cutoff = f[f <= self.hz_cutoff].shape[0]
-            spec = torch.from_numpy(spec[:cutoff, :])
+            spec = spec[:cutoff, :]
+
+            # spec = (spec - (-12)) / 1.7
+
+            spec = torch.from_numpy(spec)
         else:
             spec = torch.from_numpy(spec)
 
