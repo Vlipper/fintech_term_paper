@@ -34,11 +34,11 @@ def test_inference(model, data_loader):
     return preds
 
 
-num_bins = 17
+num_bins = 20  # 17
 
 model = tv_models.resnet34(pretrained=False)
 model = models.get_resnet(model, out_size=num_bins-1)
-model_name = 'spectr_net_v1_best_state.pth'  # _best_state, _last_state
+model_name = 'spectr_net_v1_test' + '_best_state.pth'  # {_best_state, _last_state}
 
 # model_path = '/mntlong/lanl_comp/logs/' + model_name
 file_dir = os.path.dirname(__file__)
@@ -54,7 +54,7 @@ test_data_path = os.path.join(data_path, 'test')
 test_names = os.listdir(test_data_path)
 # test_names = test_names[:50]
 
-batch_size = 1000  # 1300
+batch_size = 1000
 
 hz_cutoff = 600000  # {0, ..., 600000, ...}
 window_size = 150000
@@ -114,7 +114,7 @@ submit.to_csv(submit_path, index=False)
 submit_command = "kaggle competitions submit -c LANL-Earthquake-Prediction " \
                  "-f {} -m 'spect_resnet34'".format(submit_path)
 if subprocess.run(submit_command, shell=True).returncode == 0:
-    print('waiting 20 sec. for results')
+    print('\n', 'wait 20 sec. for results')
     time.sleep(20)
 else:
     raise Exception('submit was not done')

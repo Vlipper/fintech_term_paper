@@ -11,6 +11,17 @@
 # print(train_signal.shape)
 #
 #
+#
+# train_data_path = os.path.join(data_path, 'train.csv')
+# train_data = pd.read_csv(train_data_path,
+#                          dtype={'acoustic_data': np.int16,
+#                                 'time_to_failure': np.float32})
+# train_signal = train_data['acoustic_data'].values
+# train_quaketime = train_data['time_to_failure'].values
+# del train_data
+#
+#
+#
 # #%% tests
 # import torch
 # inpt = torch.rand(3, 1, 150000)

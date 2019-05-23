@@ -20,7 +20,7 @@ def spectrogram(sig_in, nperseg):
     nperseg = nperseg  # default 256 -- размер окна
     noverlap = nperseg // 8
     fs = 4 * 1e+6  # raw signal sample rate is 4MHz
-    window = 'hann'  # {triang, hamming}
+    window = 'hann'  # {triang, hamming, hann}
     detrend = 'linear'  # {'linear', 'constant', False}
     scaling = 'density'  # {'density', 'spectrum'}
     eps = 1e-11
@@ -51,9 +51,19 @@ def left_padding(row, needed_len):
     return row_padded
 
 
-def train_spec_model(model, optimizer, lr_scheduler, train_loader, val_loader,
-                     num_epochs, model_name, logs_path, log_writer, loss_fn,
-                     num_bins):
+def save_model(save_path, epoch, model, optimizer, val_mean_loss, val_mean_metrics):
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'val_mean_loss': val_mean_loss,
+        'val_mean_metrics': val_mean_metrics
+    }, save_path)
+
+
+def train_clf_model(model, optimizer, lr_scheduler, train_loader, val_loader,
+                    num_epochs, model_name, logs_path, log_writer, loss_fn,
+                    num_bins):
     model = model.to(cuda)
     torch_bins = torch.linspace(0, 16.11, num_bins, dtype=torch.float32)
     n_iter_train = 1
@@ -122,11 +132,11 @@ def train_spec_model(model, optimizer, lr_scheduler, train_loader, val_loader,
 
                 loss_val_batch.append(loss.item())
                 metrics_val_batch.append(metrics.item())
-
-        # change lr
         val_mean_loss = np.mean(loss_val_batch)
         val_mean_metrics = np.mean(metrics_val_batch)
-        lr_scheduler.step(val_mean_metrics)
+
+        # change lr
+        lr_scheduler.step(val_mean_loss)
 
         # logging
         log_writer.add_scalars('loss',
@@ -141,25 +151,11 @@ def train_spec_model(model, optimizer, lr_scheduler, train_loader, val_loader,
 
         # saving model TODO: make generator to save N last epochs
         save_path = os.path.join(logs_path, model_name + '_last_state.pth')
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'val_mean_loss': val_mean_loss,
-            'val_mean_metrics': val_mean_metrics
-        }, save_path)
+        save_model(save_path, epoch, model, optimizer, val_mean_loss, val_mean_metrics)
 
-        if epoch == 0:
-            best_val_mean_loss = val_mean_loss
-        else:
-            if val_mean_loss < best_val_mean_loss:
-                best_val_mean_loss = val_mean_loss
+        if epoch == 0 or val_mean_metrics < best_val_mean_metrics:
+            best_val_mean_metrics = val_mean_metrics
 
-                save_path = os.path.join(logs_path, model_name + '_best_state.pth')
-                torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'val_mean_loss': val_mean_loss,
-                    'val_mean_metrics': val_mean_metrics
-                }, save_path)
+            save_path = os.path.join(logs_path, model_name + '_best_state.pth')
+            save_model(save_path, epoch, model, optimizer,
+                       val_mean_loss, val_mean_metrics)

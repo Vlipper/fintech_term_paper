@@ -23,3 +23,7 @@ Commands:
 - python3.7 train_
 - tensorboard --logdir /mntlong/lanl_comp/logs/runs/
 - ssh -N -f -L 6006:localhost:6006 168.62.161.216
+- az vm deallocate --resource-group my_resources --name sound-gpu
+
+
+- signal stats. mean, std: 4.5195 10.7357

@@ -41,19 +41,18 @@ train_signal = train_signal[:val_start_idx]
 train_quaketime = train_quaketime[:val_start_idx]
 
 # training params
-model_name = 'spectr_net_v1'
-batch_size = 100  # 1300
-num_epochs = 5
+model_name = 'spectr_net_v1_test'
+batch_size = 120  # 1300
+num_epochs = 10
 
 hz_cutoff = 600000  # {0, ..., 600000, ...}
 window_size = 150000
-overlap_size = int(window_size * 0.5)
+overlap_size = int(window_size * 0.6)
 nperseg = 2048
 
-num_bins = 17
+num_bins = 20  # 17
 
 # get modified resnet model
-# model = models.BaselineNetSpect()
 model = tv_models.resnet34(pretrained=True)
 model = models.get_resnet(model, out_size=num_bins-1)
 loss_fn = nn.CrossEntropyLoss()
@@ -89,8 +88,8 @@ opt = optim.Adam(model.parameters(), lr=3e-4)
 lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
 log_writer = SummaryWriter(log_writer_path)
 
-utils.train_spec_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
-                       train_loader=train_loader, val_loader=val_loader,
-                       num_epochs=num_epochs, model_name=model_name,
-                       logs_path=logs_path, log_writer=log_writer,
-                       loss_fn=loss_fn, num_bins=num_bins)
+utils.train_clf_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
+                      train_loader=train_loader, val_loader=val_loader,
+                      num_epochs=num_epochs, model_name=model_name,
+                      logs_path=logs_path, log_writer=log_writer,
+                      loss_fn=loss_fn, num_bins=num_bins)
