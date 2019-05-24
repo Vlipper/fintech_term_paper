@@ -189,10 +189,12 @@ class LRFinder(object):
 
         return running_loss / len(dataloader.dataset)
 
-    def plot(self, skip_start=10, skip_end=5, log_lr=True, plot_path):
+    def plot(self, skip_start=10, skip_end=5, log_lr=True, plot_path='lr_finder_plot.png'):
         """Plots the learning rate range test.
 
         Arguments:
+            plot_path (str): path with filename.png to save plot.
+                Default: 'lr_finder_plot.png'
             skip_start (int, optional): number of batches to trim from the start.
                 Default: 10.
             skip_end (int, optional): number of batches to trim from the start.
@@ -224,8 +226,8 @@ class LRFinder(object):
             plt.xscale("log")
         plt.xlabel("Learning rate")
         plt.ylabel("Loss")
-        # plt.show()
         plt.savefig(plot_path)
+        plt.show()
 
 
 class LinearLR(_LRScheduler):
