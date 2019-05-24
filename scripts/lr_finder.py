@@ -1,6 +1,7 @@
 from __future__ import print_function, with_statement, division
 import copy
 import os
+import numpy as np
 import torch
 from tqdm.autonotebook import tqdm
 from torch.optim.lr_scheduler import _LRScheduler
@@ -228,6 +229,13 @@ class LRFinder(object):
         plt.ylabel("Loss")
         plt.savefig(plot_path)
         plt.show()
+
+    def get_best_lr(self):
+        if self.best_loss is not None:
+            best_loss_idx = np.argmin(self.history['loss'])
+            return self.history['lr'][best_loss_idx]
+        else:
+            raise Exception('range_test was not runned')
 
 
 class LinearLR(_LRScheduler):
