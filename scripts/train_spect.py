@@ -1,3 +1,4 @@
+import argparse
 import os
 # os.environ['MKL_NUM_THREADS'] = '1'
 from datetime import datetime
@@ -18,78 +19,107 @@ import models
 import utils
 
 
-# load train data into ram
-# data_path = '/mntlong/lanl_comp/data/'
-file_dir = os.path.dirname(__file__)
-data_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'data'))
-train_info_path = os.path.join(data_path, 'train_info.csv')
-train_data_path = os.path.join(data_path, 'train_compressed.npz')
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_name', default='spectr_net_default')
+    parser.add_argument('--num_epochs', default=10)
+    parser.add_argument('--batch_size', default=120)
+    parser.add_argument('--find_lr', default=False, action='store_true')
+    return parser.parse_args()
 
-train_info = pd.read_csv(train_info_path, index_col='Unnamed: 0')
-train_info['exp_len'] = train_info['indx_end'] - train_info['indx_start']
 
-train_signal = np.load(train_data_path)['signal']
-train_quaketime = np.load(train_data_path)['quake_time']
+def main(args):
+    # load train data into ram
+    # data_path = '/mntlong/lanl_comp/data/'
+    file_dir = os.path.dirname(__file__)
+    data_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'data'))
+    train_info_path = os.path.join(data_path, 'train_info.csv')
+    train_data_path = os.path.join(data_path, 'train_compressed.npz')
 
-# В валидацию берем 2 последних волны (части эксперимента)
-val_start_idx = train_info.iloc[-2, :]['indx_start']
+    train_info = pd.read_csv(train_info_path, index_col='Unnamed: 0')
+    train_info['exp_len'] = train_info['indx_end'] - train_info['indx_start']
 
-val_signal = train_signal[val_start_idx:]
-val_quaketime = train_quaketime[val_start_idx:]
+    train_signal = np.load(train_data_path)['signal']
+    train_quaketime = np.load(train_data_path)['quake_time']
 
-train_signal = train_signal[:val_start_idx]
-train_quaketime = train_quaketime[:val_start_idx]
+    # В валидацию берем 2 последних волны (части эксперимента)
+    val_start_idx = train_info.iloc[-2, :]['indx_start']
 
-# training params
-model_name = 'spectr_net_v1_test'
-batch_size = 120  # 1300
-num_epochs = 10
+    val_signal = train_signal[val_start_idx:]
+    val_quaketime = train_quaketime[val_start_idx:]
 
-hz_cutoff = 600000  # {0, ..., 600000, ...}
-window_size = 150000
-overlap_size = int(window_size * 0.6)
-nperseg = 2048
+    train_signal = train_signal[:val_start_idx]
+    train_quaketime = train_quaketime[:val_start_idx]
 
-num_bins = 20  # 17
+    # spectrogram params
+    nperseg = 1024
+    hz_cutoff = 600000  # {0, ..., 600000, ...}
+    window_size = 150000
+    overlap_size = int(window_size * 0.6)
 
-# get modified resnet model
-model = tv_models.resnet34(pretrained=True)
-model = models.get_resnet(model, out_size=num_bins-1)
-loss_fn = nn.CrossEntropyLoss()
+    num_bins = 17  # 17
 
-# logs_path = '/mntlong/lanl_comp/logs/'
-logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
-current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
-log_writer_path = os.path.join(logs_path, 'runs', current_datetime + '_' + model_name)
+    # get modified resnet model
+    model = tv_models.resnet34(pretrained=True)
+    model = models.get_resnet(model, out_size=num_bins-1)
+    loss_fn = nn.CrossEntropyLoss()
 
-train_dataset = data.SpectrogramDataset(train_signal, train_quaketime, num_bins=num_bins,
-                                        idxs_wave_end=train_info['indx_end'].values,
-                                        hz_cutoff=hz_cutoff, window_size=window_size,
-                                        overlap_size=overlap_size, nperseg=nperseg)
-val_dataset = data.SpectrogramDataset(val_signal, val_quaketime, num_bins=num_bins,
-                                      idxs_wave_end=train_info['indx_end'].values,
-                                      hz_cutoff=hz_cutoff, window_size=window_size,
-                                      overlap_size=overlap_size, nperseg=nperseg)
+    # logs_path = '/mntlong/lanl_comp/logs/'
+    logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
+    current_datetime = datetime.today().strftime('%b-%d_%H-%M-%S')
+    log_writer_path = os.path.join(logs_path, 'runs',
+                                   current_datetime + '_' + args.model_name)
 
-print('spectrogram size:', train_dataset[0][0].size())
+    train_dataset = data.SpectrogramDataset(train_signal, train_quaketime,
+                                            num_bins=num_bins,
+                                            idxs_wave_end=train_info['indx_end'].values,
+                                            hz_cutoff=hz_cutoff,
+                                            window_size=window_size,
+                                            overlap_size=overlap_size,
+                                            nperseg=nperseg)
+    val_dataset = data.SpectrogramDataset(val_signal, val_quaketime,
+                                          num_bins=num_bins,
+                                          idxs_wave_end=train_info['indx_end'].values,
+                                          hz_cutoff=hz_cutoff,
+                                          window_size=window_size,
+                                          overlap_size=overlap_size,
+                                          nperseg=nperseg)
+    print('spectrogram size:', train_dataset[0][0].size())
 
-train_loader = DataLoader(dataset=train_dataset,
-                          batch_size=batch_size,
-                          shuffle=True,
-                          num_workers=5,
-                          pin_memory=True)
-val_loader = DataLoader(dataset=val_dataset,
-                        batch_size=batch_size,
-                        shuffle=False,
-                        num_workers=5,
-                        pin_memory=True)
+    train_loader = DataLoader(dataset=train_dataset,
+                              batch_size=args.batch_size,
+                              shuffle=True,
+                              num_workers=5,
+                              pin_memory=True)
+    val_loader = DataLoader(dataset=val_dataset,
+                            batch_size=args.batch_size,
+                            shuffle=False,
+                            num_workers=5,
+                            pin_memory=True)
 
-opt = optim.Adam(model.parameters(), lr=3e-4)
-lr_sched = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=5, threshold=0.001)
-log_writer = SummaryWriter(log_writer_path)
+    if args.find_lr:
+        from lr_finder import LRFinder
+        optimizer = optim.Adam(model.parameters(), lr=1e-5)
+        lr_find = LRFinder(model, optimizer, loss_fn, device='cuda')
+        lr_find.range_test(train_loader, end_lr=10, num_iter=30, step_mode='exp')
+        best_lr = lr_find.get_best_lr()
+        lr_find.plot()
+        lr_find.reset()
+        print('best lr found: {:.2e}'.format(best_lr))
+    else:
+        best_lr = 3e-4
 
-utils.train_clf_model(model=model, optimizer=opt, lr_scheduler=lr_sched,
-                      train_loader=train_loader, val_loader=val_loader,
-                      num_epochs=num_epochs, model_name=model_name,
-                      logs_path=logs_path, log_writer=log_writer,
-                      loss_fn=loss_fn, num_bins=num_bins)
+    optimizer = optim.Adam(model.parameters(), lr=best_lr)  # weight_decay=0.1
+    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, threshold=0.001)
+    log_writer = SummaryWriter(log_writer_path)
+
+    utils.train_clf_model(model=model, optimizer=optimizer, lr_scheduler=lr_sched,
+                          train_loader=train_loader, val_loader=val_loader,
+                          num_epochs=args.num_epochs, model_name=args.model_name,
+                          logs_path=logs_path, log_writer=log_writer,
+                          loss_fn=loss_fn, num_bins=num_bins)
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    main(args)

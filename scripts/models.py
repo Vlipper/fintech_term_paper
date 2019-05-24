@@ -199,9 +199,10 @@ class BaselineNetRawSignalV5(nn.Module):
                                       nn.BatchNorm1d(256),
                                       nn.ReLU())
 
-        self.output = nn.Sequential(nn.AdaptiveAvgPool1d(1),
-                                    Flatten(),
-                                    nn.Linear(in_features=256, out_features=out_size, bias=True))
+        self.tofc = nn.Sequential(nn.AdaptiveAvgPool1d(1),
+                                  Flatten())
+
+        self.fc = nn.Linear(in_features=256, out_features=out_size, bias=True)
 
         self.relu = nn.ReLU()
 
@@ -222,7 +223,8 @@ class BaselineNetRawSignalV5(nn.Module):
         out = self.layer2_2(out)
         out += self.downsample2(skip)
 
-        out = self.output(out)
+        out = self.tofc(out)
+        # out = self.fc(out)
 
         return out
 
@@ -284,11 +286,98 @@ class BaselineNetRawSignalCnnRnnV1(nn.Module):
 
         out = out.view(-1, 1, 256)
         out = self.rnn(out)[0]
-        # out = out.view(-1, 512)
         out = out.squeeze(1)
 
         out = self.fc(out)
         return out
+
+
+class RawSignalCnnRnnV2(nn.Module):
+    def __init__(self, out_size):
+        super().__init__()
+
+        self.cnn = nn.Sequential(
+            nn.Conv1d(1, 32, 4000, stride=10, bias=False),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.MaxPool1d(3),
+
+            nn.Conv1d(32, 64, 3, stride=1, bias=False),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.Conv1d(64, 64, 3, stride=1, bias=False),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+            nn.MaxPool1d(3),
+
+            nn.Conv1d(64, 128, 3, stride=1, bias=False),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Conv1d(128, 128, 3, stride=1, bias=False),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.MaxPool1d(3),
+
+            nn.Conv1d(128, 256, 3, stride=1, bias=False),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Conv1d(256, 256, 3, stride=1, bias=False),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
+
+            nn.Conv1d(256, 512, 3, stride=1, bias=False),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Conv1d(512, 512, 3, stride=1, bias=False),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+
+            nn.AdaptiveAvgPool1d(1),
+            Flatten()
+        )
+
+        # self.rnn = nn.RNN(input_size=256, hidden_size=512, num_layers=2,
+        #                   nonlinearity='relu', batch_first=True)
+        self.rnn = nn.LSTM(input_size=512, hidden_size=512, num_layers=10,
+                           batch_first=True)
+
+        self.fc = nn.Linear(in_features=512, out_features=out_size, bias=True)
+
+    def forward(self, inpt):
+        out = self.cnn(inpt)
+
+        out = out.view(-1, 1, 256)
+        out = self.rnn(out)[0]
+        out = out.squeeze(1)
+
+        out = self.fc(out)
+        return out
+
+
+# class CnnRnnV2(nn.Module):
+#     def __init__(self, out_size):
+#         super().__init__()
+#
+#         self.cnn = BaselineNetRawSignalV5(1)
+#
+#         # self.rnn = nn.RNN(input_size=256, hidden_size=512, num_layers=2,
+#         #                   nonlinearity='relu', batch_first=True)
+#         self.rnn = nn.LSTM(input_size=256, hidden_size=512, num_layers=10,
+#                            batch_first=True)
+#
+#         self.fc = nn.Linear(in_features=512, out_features=out_size, bias=True)
+#
+#     def forward(self, inpt):
+#         out = self.cnn(inpt)
+#
+#         out = out.view(-1, 1, 256)
+#         out = self.rnn(out)[0]
+#         # out = out.view(-1, 512)
+#         out = out.squeeze(1)
+#
+#         out = self.fc(out)
+#         return out
 
 
 # Spectrogram models

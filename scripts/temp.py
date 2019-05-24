@@ -45,18 +45,44 @@
 # pad = torch.empty(padding_size, dtype=tensor.dtype).fill_(self.fill_value)
 # tensor = torch.cat((tensor, pad), dim=self.len_dim)
 
-import os
-os.environ['MKL_NUM_THREADS'] = '1'
-import numpy as np
-import utils
+# import os
+# os.environ['MKL_NUM_THREADS'] = '1'
+# import numpy as np
+# import utils
+#
+#
+# def main():
+#     inpt = np.random.randint(-10, 10, 150000)
+#
+#     for i in range(1000):
+#         out = utils.spectrogram(inpt, 256)
+#
+#
+# if __name__ == '__main__':
+#     main()
+
+from lr_finder import LRFinder
+
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=1e-7, weight_decay=1e-2)
+lr_finder = LRFinder(model, optimizer, criterion, device="cuda")
+lr_finder.range_test(trainloader, end_lr=100, num_iter=100, step_mode="exp")
+# lr_finder.plot()
+# lr_finder.history
 
 
-def main():
-    inpt = np.random.randint(-10, 10, 150000)
-
-    for i in range(1000):
-        out = utils.spectrogram(inpt, 256)
-
-
-if __name__ == '__main__':
-    main()
+# import argparse
+#
+#
+# def parse_args():
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('--find_lr', default=False, action='store_true')
+#     parser.add_argument('--model_name', default='spectr_net_default')
+#     parser.add_argument('--num_epochs', default=10)
+#     parser.add_argument('--batch_size', default=120)
+#     return parser.parse_args()
+#
+#
+# if __name__ == '__main__':
+#     args = parse_args()
+#     print(type(args.find_lr), args.find_lr)
