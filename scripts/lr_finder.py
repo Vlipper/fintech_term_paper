@@ -230,9 +230,18 @@ class LRFinder(object):
         plt.savefig(plot_path)
         plt.show()
 
-    def get_best_lr(self):
+    def get_best_lr(self, ma_window=3):
         if self.best_loss is not None:
-            best_loss_idx = np.argmin(self.history['loss'])
+            loss_curve = np.array(self.history['loss'])
+            loss_diffs = np.append(0, np.diff(loss_curve))
+
+            # calc moving average smooth on loss_diffs
+            loss_diffs_ma = np.convolve(loss_diffs,
+                                        np.ones(ma_window),
+                                        'valid') / ma_window
+            loss_diffs_ma = np.append(np.repeat(0, ma_window-1), loss_diffs_ma)
+
+            best_loss_idx = np.argmin(loss_diffs_ma)
             return self.history['lr'][best_loss_idx]
         else:
             raise Exception('range_test was not runned')
