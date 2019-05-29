@@ -51,6 +51,24 @@ def left_padding(row, needed_len):
     return row_padded
 
 
+def apply_wd(model, gamma):
+    for name, tensor in model.named_parameters():
+        if 'bias' in name:
+            continue
+        tensor.data.add_(-gamma * tensor.data)
+
+
+def calc_grad_norm(model):
+    norm = 0
+    count = 0
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            # grad += torch.sqrt(torch.sum((tensor.grad.data) ** 2))
+            norm += torch.norm(param.grad.data)
+            count += 1
+    return norm.item() / count
+
+
 def save_model(save_path, epoch, model, optimizer, val_mean_loss, val_mean_metrics):
     torch.save({
         'epoch': epoch,
@@ -108,6 +126,9 @@ def train_clf_model(model, optimizer, lr_scheduler, train_loader, val_loader,
             # log_writer.add_scalars('gradients_norms',
             #                        grads_norms,
             #                        n_iter_train)
+            log_writer.add_scalar('mean_grad_norm',
+                                  calc_grad_norm(model),
+                                  n_iter_train)
 
             n_iter_train += 1
 

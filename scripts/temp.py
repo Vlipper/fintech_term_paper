@@ -64,9 +64,10 @@
 from lr_finder import LRFinder
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-7, weight_decay=1e-2)
+optimizer = optim.Adam(model.parameters(), lr=1e-5)
 lr_finder = LRFinder(model, optimizer, criterion, device="cuda")
-lr_finder.range_test(trainloader, end_lr=100, num_iter=100, step_mode="exp")
+lr_finder.range_test(train_loader, end_lr=1, num_iter=50, step_mode="exp")
+lr_finder.get_best_lr()
 # lr_finder.plot()
 # lr_finder.history
 

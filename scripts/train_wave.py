@@ -19,9 +19,9 @@ import utils
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', default='spectr_net_default')
-    parser.add_argument('--num_epochs', default=10)
-    parser.add_argument('--batch_size', default=120)
+    parser.add_argument('--model_name', default='wave_net_default', type=str)
+    parser.add_argument('--num_epochs', default=10, type=int)
+    parser.add_argument('--batch_size', default=150, type=int)
     parser.add_argument('--find_lr', default=False, action='store_true')
     return parser.parse_args()
 
@@ -89,9 +89,9 @@ def main(args):
 
     if args.find_lr:
         from lr_finder import LRFinder
-        optimizer = optim.Adam(model.parameters(), lr=1e-5)
+        optimizer = optim.Adam(model.parameters(), lr=1e-6)
         lr_find = LRFinder(model, optimizer, loss_fn, device='cuda')
-        lr_find.range_test(train_loader, end_lr=10, num_iter=30, step_mode='exp')
+        lr_find.range_test(train_loader, end_lr=1, num_iter=50, step_mode='exp')
         best_lr = lr_find.get_best_lr()
         lr_find.plot()
         lr_find.reset()
@@ -100,7 +100,10 @@ def main(args):
         best_lr = 3e-4
 
     optimizer = optim.Adam(model.parameters(), lr=best_lr)  # weight_decay=0.1
-    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, threshold=0.001)
+    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                    factor=0.5,
+                                                    patience=3,
+                                                    threshold=0.005)
     log_writer = SummaryWriter(log_writer_path)
 
     utils.train_clf_model(model=model, optimizer=optimizer, lr_scheduler=lr_sched,

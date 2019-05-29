@@ -48,13 +48,14 @@ class SignalDataset(Dataset):
 
 # spectrogram dataset
 class SpectrogramDataset(Dataset):
-    def __init__(self, signal, target, idxs_wave_end, num_bins,
+    def __init__(self, signal, target, idxs_wave_end, num_bins, stdscale=True,
                  hz_cutoff=600000, window_size=10000, overlap_size=5000, nperseg=256):
         super().__init__()
 
         self.signal = signal
         self.target = target
         self.hz_cutoff = hz_cutoff
+        self.stdscale = stdscale
 
         # spectrogram func params
         self.nperseg = nperseg
@@ -85,12 +86,13 @@ class SpectrogramDataset(Dataset):
         if self.hz_cutoff:
             cutoff = f[f <= self.hz_cutoff].shape[0]
             spec = spec[:cutoff, :]
-
-            # spec = (spec - (-12)) / 1.7
-
             spec = torch.from_numpy(spec)
         else:
             spec = torch.from_numpy(spec)
+
+        if self.stdscale:
+            spec = (spec - (-12)) / 1.7
+            # spec = torch.clamp(spec, (-12) - 2*1.7, (-12) + 2*1.7)
 
         if self.target is not None:
             target = torch.tensor(self.target[end_idx - 1])

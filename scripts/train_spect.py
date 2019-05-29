@@ -21,9 +21,9 @@ import utils
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name', default='spectr_net_default')
-    parser.add_argument('--num_epochs', default=10)
-    parser.add_argument('--batch_size', default=120)
+    parser.add_argument('--model_name', default='spectr_net_default', type=str)
+    parser.add_argument('--num_epochs', default=10, type=int)
+    parser.add_argument('--batch_size', default=150, type=int)
     parser.add_argument('--find_lr', default=False, action='store_true')
     return parser.parse_args()
 
@@ -52,12 +52,14 @@ def main(args):
     train_quaketime = train_quaketime[:val_start_idx]
 
     # spectrogram params
-    nperseg = 1024
+    nperseg = 2048
     hz_cutoff = 600000  # {0, ..., 600000, ...}
     window_size = 150000
-    overlap_size = int(window_size * 0.6)
+    train_overlap_size = int(window_size * 0.5)
+    val_overlap_size = int(window_size * 0.8)
 
     num_bins = 17  # 17
+    wd = 1e-3  # 5e-4
 
     # get modified resnet model
     model = tv_models.resnet34(pretrained=True)
@@ -73,16 +75,18 @@ def main(args):
     train_dataset = data.SpectrogramDataset(train_signal, train_quaketime,
                                             num_bins=num_bins,
                                             idxs_wave_end=train_info['indx_end'].values,
+                                            stdscale=True,
                                             hz_cutoff=hz_cutoff,
                                             window_size=window_size,
-                                            overlap_size=overlap_size,
+                                            overlap_size=train_overlap_size,
                                             nperseg=nperseg)
     val_dataset = data.SpectrogramDataset(val_signal, val_quaketime,
                                           num_bins=num_bins,
                                           idxs_wave_end=train_info['indx_end'].values,
+                                          stdscale=True,
                                           hz_cutoff=hz_cutoff,
                                           window_size=window_size,
-                                          overlap_size=overlap_size,
+                                          overlap_size=val_overlap_size,
                                           nperseg=nperseg)
     print('spectrogram size:', train_dataset[0][0].size())
 
@@ -99,9 +103,9 @@ def main(args):
 
     if args.find_lr:
         from lr_finder import LRFinder
-        optimizer = optim.Adam(model.parameters(), lr=1e-5)
+        optimizer = optim.Adam(model.parameters(), lr=1e-5, weight_decay=wd)
         lr_find = LRFinder(model, optimizer, loss_fn, device='cuda')
-        lr_find.range_test(train_loader, end_lr=10, num_iter=30, step_mode='exp')
+        lr_find.range_test(train_loader, end_lr=1, num_iter=50, step_mode='exp')
         best_lr = lr_find.get_best_lr()
         lr_find.plot()
         lr_find.reset()
@@ -109,8 +113,11 @@ def main(args):
     else:
         best_lr = 3e-4
 
-    optimizer = optim.Adam(model.parameters(), lr=best_lr)  # weight_decay=0.1
-    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, threshold=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=best_lr, weight_decay=wd)
+    lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                    factor=0.5,
+                                                    patience=3,
+                                                    threshold=0.01)
     log_writer = SummaryWriter(log_writer_path)
 
     utils.train_clf_model(model=model, optimizer=optimizer, lr_scheduler=lr_sched,

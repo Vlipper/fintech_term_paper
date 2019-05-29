@@ -34,11 +34,11 @@ def test_inference(model, data_loader):
     return preds
 
 
-num_bins = 20  # 17
+num_bins = 17  # 17
 
 model = tv_models.resnet34(pretrained=False)
 model = models.get_resnet(model, out_size=num_bins-1)
-model_name = 'spectr_net_v1_test' + '_best_state.pth'  # {_best_state, _last_state}
+model_name = 'spec_net_v1_512' + '_best_state.pth'  # {_best_state, _last_state}
 
 # model_path = '/mntlong/lanl_comp/logs/' + model_name
 file_dir = os.path.dirname(__file__)
@@ -47,6 +47,7 @@ model_path = os.path.join(logs_path, model_name)
 model.load_state_dict(torch.load(model_path)['model_state_dict'])
 model = model.to(cuda)
 model.eval()
+print('best epoch: {}'.format(torch.load(model_path)['epoch']))
 
 # test_data_path = '/mntlong/lanl_comp/data/test/'
 data_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'data'))
@@ -54,12 +55,12 @@ test_data_path = os.path.join(data_path, 'test')
 test_names = os.listdir(test_data_path)
 # test_names = test_names[:50]
 
-batch_size = 1000
+batch_size = 200
 
+nperseg = 512
 hz_cutoff = 600000  # {0, ..., 600000, ...}
 window_size = 150000
 overlap_size = int(window_size * 0.0)
-nperseg = 2048
 
 for wave_num, test_wave in enumerate(tqdm(test_names,
                                           desc='test inference',
@@ -68,6 +69,7 @@ for wave_num, test_wave in enumerate(tqdm(test_names,
                            dtype=np.float32, skiprows=1)
     test_dataset = data.SpectrogramDataset(wave_data, target=None,
                                            idxs_wave_end=[1500000],
+                                           stdscale=True,
                                            num_bins=None,
                                            hz_cutoff=hz_cutoff,
                                            window_size=window_size,
@@ -112,7 +114,7 @@ submit.to_csv(submit_path, index=False)
 
 # submit to kaggle
 submit_command = "kaggle competitions submit -c LANL-Earthquake-Prediction " \
-                 "-f {} -m 'spect_resnet34'".format(submit_path)
+                 "-f {} -m 'default'".format(submit_path)
 if subprocess.run(submit_command, shell=True).returncode == 0:
     print('\n', 'wait 20 sec. for results')
     time.sleep(20)
