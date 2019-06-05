@@ -100,3 +100,63 @@ class SpectrogramDataset(Dataset):
             return spec.view(1, spec.size(0), -1), target, target_bin
         else:
             return spec.view(1, spec.size(0), -1)
+
+
+# signal CPC dataset
+class SignalCPCDataset(Dataset):
+    def __init__(self, signal, target, idxs_wave_end, num_bins,
+                 large_ws=150000, overlap_size=5000, small_ws=15000,
+                 scale_clamp=True):
+        super().__init__()
+
+        self.signal = signal
+        self.target = target
+        self.small_ws = small_ws
+        self.scale_clamp = scale_clamp
+        self.mean = 4.5195
+        self.std = 10.7357
+
+        # make borders for every example
+        #  and exclude borders which include different waves
+        next_wave_windows = [(i, i + large_ws) for i in idxs_wave_end]
+        wave_size = signal.shape[0]
+        self.boarder_points = [(i, i + large_ws)
+                               for i in range(0, wave_size,
+                                              large_ws - overlap_size)
+                               if i + large_ws <= wave_size
+                               and utils.other_wave_check(i + large_ws,
+                                                          next_wave_windows)]
+
+        # split target on bins
+        if target is not None:
+            bins = np.linspace(0, 16.11, num_bins)
+            self.target_bins = np.digitize(target, bins) - 1
+
+    def __len__(self):
+        return len(self.boarder_points)
+
+    def __getitem__(self, index):
+        start_idx, end_idx = self.boarder_points[index]
+        signal = self.signal[start_idx:end_idx]
+
+        if self.scale_clamp:
+            signal = (signal - self.mean) / self.std
+            # signal = torch.clamp(signal,
+            #                      self.mean - 3 * self.std,
+            #                      self.mean + 3 * self.std)
+
+        # if signal.shape[0] < self.small_ws:
+        #     signal = utils.left_padding(signal, self.small_ws)
+
+        signal = torch.from_numpy(signal)
+        signal = signal.view(-1, 1, self.small_ws)  # size is (bs_x, 1, small_ws)
+        # signal = signal.view(1, -1)
+
+        if self.target is not None:
+            target = np.append(0, self.target[start_idx:end_idx])[::self.small_ws][1:]
+            target_bin = np.append(0, self.target_bins[start_idx:end_idx])[::self.small_ws][1:]
+            target, target_bin = torch.from_numpy(target), torch.from_numpy(target_bin)
+
+            return signal, target, target_bin
+        else:
+            return signal

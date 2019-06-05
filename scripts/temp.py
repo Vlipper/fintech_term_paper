@@ -70,20 +70,3 @@ lr_finder.range_test(train_loader, end_lr=1, num_iter=50, step_mode="exp")
 lr_finder.get_best_lr()
 # lr_finder.plot()
 # lr_finder.history
-
-
-# import argparse
-#
-#
-# def parse_args():
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('--find_lr', default=False, action='store_true')
-#     parser.add_argument('--model_name', default='spectr_net_default')
-#     parser.add_argument('--num_epochs', default=10)
-#     parser.add_argument('--batch_size', default=120)
-#     return parser.parse_args()
-#
-#
-# if __name__ == '__main__':
-#     args = parse_args()
-#     print(type(args.find_lr), args.find_lr)

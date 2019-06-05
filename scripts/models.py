@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import torch
 import torch.nn as nn
 
 
@@ -426,3 +427,83 @@ def get_resnet(torchvision_resnet, out_size):
 
     resnet_mod = nn.Sequential(modules)
     return resnet_mod
+
+
+class CPCEncoderV1(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.encoder = nn.Sequential(
+            nn.Conv1d(1, 16, 2, stride=1),
+            nn.BatchNorm1d(16),
+            nn.ReLU(),
+            # nn.MaxPool1d(3),
+
+            nn.Conv1d(16, 32, 2, stride=2, dilation=1+1),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+
+            nn.Conv1d(32, 64, 2, stride=2, dilation=1+8),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+
+            nn.Conv1d(64, 128, 2, stride=2, dilation=1+16),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+
+            nn.AdaptiveAvgPool1d(1),
+            Flatten()
+        )
+
+    def forward(self, x):
+        out = self.encoder(x)  # out.size() == (bs, ch_out * len_out)
+        # out = out.permute(0, 2, 1)
+        return out
+
+
+class CPCAutoregV1(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.ar = nn.GRU(128, 128, batch_first=True)
+
+    def forward(self, x):
+        out, _ = self.ar(x)
+        return out
+
+
+# class CPCPredV1(nn.Module):
+#     def __init__(self, head1_out_size):
+#         super().__init__()
+#
+#         self.head1 = nn.Sequential(
+#             nn.Linear(128, 128, bias=False)
+#         )
+#         self.head2 = nn.Sequential(
+#             nn.Linear(128, 64),
+#             nn.ReLU(),
+#
+#             nn.Linear(64, head1_out_size)
+#         )
+#
+#     def forward(self, context):
+#         c_w = self.head1(context)
+#         target_out = self.head2(context)
+#
+#         return c_w, target_out
+
+
+class CPCTargetHeadV1(nn.Module):
+    def __init__(self, out_size):
+        super().__init__()
+
+        self.target_head = nn.Sequential(
+            nn.Linear(128, 64),
+            nn.ReLU(),
+
+            nn.Linear(64, out_size)
+        )
+
+    def forward(self, context):
+        out = self.target_head(context)
+        return out
