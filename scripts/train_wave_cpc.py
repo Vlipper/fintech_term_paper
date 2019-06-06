@@ -93,7 +93,7 @@ def main(args):
         from lr_finder import LRFinder
         optimizer = optim.Adam(cpc_meta_model.parameters(), lr=1e-6)
         lr_find = LRFinder(cpc_meta_model, optimizer, criterion=None, device='cuda')
-        lr_find.range_test(train_loader, end_lr=10, num_iter=50, step_mode='exp')
+        lr_find.range_test(train_loader, end_lr=1, num_iter=50, step_mode='exp')
         best_lr = lr_find.get_best_lr()
         lr_find.plot()
         lr_find.reset()

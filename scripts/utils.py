@@ -202,7 +202,7 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
 
             # calc logits from enc and AR models and target_bin_pred from
             # second head after AR model
-            logits, target_bin_pred = cpc_meta_model.forwart(large_x)
+            logits, target_bin_pred = cpc_meta_model.forward(large_x)
 
             # calc InfoNCE. Positives lies on diagonals.
             loss_cpc = - torch.diagonal(logits, dim1=-2, dim2=-1).mean()
@@ -248,7 +248,7 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
 
                 # calc logits from enc and AR models and target_bin_pred from
                 # second head after AR model
-                logits, target_bin_pred = cpc_meta_model.forwart(large_x)
+                logits, target_bin_pred = cpc_meta_model.forward(large_x)
 
                 # calc InfoNCE. Positives lies on diagonals.
                 loss_cpc = - torch.diagonal(logits, dim1=-2, dim2=-1).mean()
