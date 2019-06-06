@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class Flatten(nn.Module):
@@ -429,49 +430,6 @@ def get_resnet(torchvision_resnet, out_size):
     return resnet_mod
 
 
-class CPCEncoderV1(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.encoder = nn.Sequential(
-            nn.Conv1d(1, 16, 2, stride=1),
-            nn.BatchNorm1d(16),
-            nn.ReLU(),
-            # nn.MaxPool1d(3),
-
-            nn.Conv1d(16, 32, 2, stride=2, dilation=1+1),
-            nn.BatchNorm1d(32),
-            nn.ReLU(),
-
-            nn.Conv1d(32, 64, 2, stride=2, dilation=1+8),
-            nn.BatchNorm1d(64),
-            nn.ReLU(),
-
-            nn.Conv1d(64, 128, 2, stride=2, dilation=1+16),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-
-            nn.AdaptiveAvgPool1d(1),
-            Flatten()
-        )
-
-    def forward(self, x):
-        out = self.encoder(x)  # out.size() == (bs, ch_out * len_out)
-        # out = out.permute(0, 2, 1)
-        return out
-
-
-class CPCAutoregV1(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.ar = nn.GRU(128, 128, batch_first=True)
-
-    def forward(self, x):
-        out, _ = self.ar(x)
-        return out
-
-
 # class CPCPredV1(nn.Module):
 #     def __init__(self, head1_out_size):
 #         super().__init__()
@@ -493,9 +451,33 @@ class CPCAutoregV1(nn.Module):
 #         return c_w, target_out
 
 
-class CPCTargetHeadV1(nn.Module):
+class CPCv1(nn.Module):
     def __init__(self, out_size):
         super().__init__()
+
+        self.encoder = nn.Sequential(
+            nn.Conv1d(1, 16, 2, stride=1),
+            nn.BatchNorm1d(16),
+            nn.ReLU(),
+            # nn.MaxPool1d(3),
+
+            nn.Conv1d(16, 32, 2, stride=2, dilation=1 + 1),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+
+            nn.Conv1d(32, 64, 2, stride=2, dilation=1 + 8),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
+
+            nn.Conv1d(64, 128, 2, stride=2, dilation=1 + 16),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+
+            nn.AdaptiveAvgPool1d(1),
+            Flatten()
+        )
+
+        self.ar = nn.GRU(128, 128, batch_first=True)
 
         self.target_head = nn.Sequential(
             nn.Linear(128, 64),
@@ -504,6 +486,32 @@ class CPCTargetHeadV1(nn.Module):
             nn.Linear(64, out_size)
         )
 
-    def forward(self, context):
-        out = self.target_head(context)
-        return out
+    def forward(self, large_x):
+        # large_x has shape (bs_large, bs_small, 1, seq_len)
+        # reshape large_x to (bs_large * bs_small, 1, seq_len) and go through encoder
+        large_x_shape = tuple(large_x.shape)
+        large_x = large_x.view(large_x_shape[0] * large_x_shape[1],
+                               large_x_shape[2],
+                               large_x_shape[3])
+        enc_embeds = self.encoder.forward(large_x)
+        # encoder output has shape (bs_large * bs_small, ch_out * len_out), reshape it
+        # to (bs_large, bs_small, ch_out * len_out), bs_small is truly new seq_len
+        enc_embeds = enc_embeds.view(large_x_shape[0], large_x_shape[1], -1)
+
+        # input shape of AR model must be (bs_large, seq_len, feat)
+        # output has the same shape (bs_large, seq_len, feat)
+        c, _ = self.ar.forward(enc_embeds)
+
+        # calc matmul for InfoNCE
+        z_next = enc_embeds[:, 1:, :]
+        c_t = c[:, :-1, :]
+        # z_preds has shape (bs_large, seq_len_ct, seq_len_znext)
+        z_preds = torch.matmul(c_t, z_next.transpose(1, 2))
+        logits = F.log_softmax(z_preds, dim=2)
+        # TODO: negative mining
+
+        # calc second head with clf on target and it's loss
+        # output shape is (bs_large, seq_len, out_linear)
+        target_bin_pred = self.target_head.forward(c)
+
+        return logits, target_bin_pred

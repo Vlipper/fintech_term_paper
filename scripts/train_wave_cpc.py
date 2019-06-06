@@ -1,6 +1,7 @@
 import argparse
 import os
 from datetime import datetime
+import sys
 
 import pandas as pd
 import numpy as np
@@ -55,9 +56,10 @@ def main(args):
     small_ws = 150000
     num_bins = 17
 
-    models_dict = nn.ModuleDict({'enc': models.CPCEncoderV1(),
-                                 'ar': models.CPCAutoregV1(),
-                                 'target_head': models.CPCTargetHeadV1(out_size=num_bins-1)})
+    cpc_meta_model = models.CPCv1(out_size=num_bins-1)
+    # models_dict = nn.ModuleDict({'enc': models.CPCEncoderV1(),
+    #                              'ar': models.CPCAutoregV1(),
+    #                              'target_head': models.CPCTargetHeadV1(out_size=num_bins-1)})
 
     # logs_path = '/mntlong/scripts/logs/'
     logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
@@ -87,19 +89,20 @@ def main(args):
                             num_workers=5,
                             pin_memory=True)
 
-    # if args.find_lr:
-    #     from lr_finder import LRFinder
-    #     optimizer = optim.Adam(model.parameters(), lr=1e-6)
-    #     lr_find = LRFinder(model, optimizer, loss_fn, device='cuda')
-    #     lr_find.range_test(train_loader, end_lr=1, num_iter=50, step_mode='exp')
-    #     best_lr = lr_find.get_best_lr()
-    #     lr_find.plot()
-    #     lr_find.reset()
-    #     print('best lr found: {:.2e}'.format(best_lr))
-    # else:
-    #     best_lr = 3e-4
+    if args.find_lr:
+        from lr_finder import LRFinder
+        optimizer = optim.Adam(cpc_meta_model.parameters(), lr=1e-6)
+        lr_find = LRFinder(cpc_meta_model, optimizer, criterion=None, device='cuda')
+        lr_find.range_test(train_loader, end_lr=10, num_iter=50, step_mode='exp')
+        best_lr = lr_find.get_best_lr()
+        lr_find.plot()
+        lr_find.reset()
+        print('best lr found: {:.2e}'.format(best_lr))
+    else:
+        best_lr = 3e-4
+    # sys.exit()
 
-    optimizer = optim.Adam(models_dict.parameters(), lr=3e-4)
+    optimizer = optim.Adam(cpc_meta_model.parameters(), lr=best_lr)
     lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                     factor=0.5,
                                                     patience=3,
@@ -107,7 +110,7 @@ def main(args):
     log_writer = SummaryWriter(log_writer_path)
     # log_writer = None
 
-    utils.train_cpc_model(models_dict=models_dict, optimizer=optimizer,
+    utils.train_cpc_model(cpc_meta_model=cpc_meta_model, optimizer=optimizer,
                           num_bins=num_bins, lr_scheduler=lr_sched,
                           train_loader=train_loader, val_loader=val_loader,
                           num_epochs=args.num_epochs, model_name=args.model_name,

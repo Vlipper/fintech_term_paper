@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from tqdm.autonotebook import tqdm
 from torch.optim.lr_scheduler import _LRScheduler
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 
@@ -165,7 +166,11 @@ class LRFinder(object):
         # Forward pass
         self.optimizer.zero_grad()
         outputs = self.model(inputs)
-        loss = self.criterion(outputs, labels)
+        # loss = self.criterion(outputs, labels)
+
+        loss_cpc = - torch.diagonal(outputs[0], dim1=-2, dim2=-1).mean()
+        loss_target = F.cross_entropy(outputs[1].permute(0, 2, 1), labels)
+        loss = loss_cpc + loss_target
 
         # Backward pass
         loss.backward()

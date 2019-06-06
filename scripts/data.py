@@ -157,6 +157,6 @@ class SignalCPCDataset(Dataset):
             target_bin = np.append(0, self.target_bins[start_idx:end_idx])[::self.small_ws][1:]
             target, target_bin = torch.from_numpy(target), torch.from_numpy(target_bin)
 
-            return signal, target, target_bin
+            return signal.float(), target.float(), target_bin
         else:
-            return signal
+            return signal.float()

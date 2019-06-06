@@ -59,8 +59,8 @@ def apply_wd(model, gamma):
 
 
 def calc_grad_norm(model):
-    norm = 0
-    count = 0
+    norm = 0.0
+    count = 0.0
     for name, param in model.named_parameters():
         if param.grad is not None:
             # grad += torch.sqrt(torch.sum((tensor.grad.data) ** 2))
@@ -182,56 +182,33 @@ def train_clf_model(model, optimizer, lr_scheduler, train_loader, val_loader,
                        val_mean_loss, val_mean_metrics)
 
 
-def train_cpc_model(models_dict, train_loader, val_loader,
+def train_cpc_model(cpc_meta_model, train_loader, val_loader,
                     optimizer, lr_scheduler, num_epochs,
                     model_name, logs_path, log_writer, num_bins):
-    models_dict.to(cuda)
+    cpc_meta_model.to(cuda)
 
     torch_bins = torch.linspace(0, 16.11, num_bins, dtype=torch.float32)
     n_iter_train = 1
     for epoch in range(num_epochs):
         # training process
-        models_dict.train()
+        cpc_meta_model.train()
         for large_x, target, target_bin in tqdm(train_loader,
                                                 desc='training, epoch={}'.format(epoch + 1),
                                                 position=0):
-            large_x = large_x.to(device=cuda, dtype=torch.float32, non_blocking=True)
-            target = target.to(device=cuda, dtype=torch.float32, non_blocking=True)
+            large_x = large_x.to(device=cuda, non_blocking=True)
+            target = target.to(device=cuda, non_blocking=True)
             target_bin = target_bin.to(device=cuda, non_blocking=True)
             optimizer.zero_grad()
 
-            # large_x has shape (bs_large, bs_small, 1, seq_len)
-            # reshape large_x to (bs_large * bs_small, 1, seq_len) and go through encoder
-            large_x_shape = tuple(large_x.shape)
-            large_x = large_x.view(large_x_shape[0] * large_x_shape[1],
-                                   large_x_shape[2],
-                                   large_x_shape[3])
-            enc_embeds = models_dict['enc'].forward(large_x)
-            # encoder output has shape (bs_large * bs_small, ch_out * len_out), reshape it
-            # to (bs_large, bs_small, ch_out * len_out), bs_small is truly new seq_len
-            enc_embeds = enc_embeds.view(large_x_shape[0], large_x_shape[1], -1)
+            # calc logits from enc and AR models and target_bin_pred from
+            # second head after AR model
+            logits, target_bin_pred = cpc_meta_model.forwart(large_x)
 
-            # input shape of AR model must be (bs_large, seq_len, feat)
-            # output has the same shape (bs_large, seq_len, feat)
-            c = models_dict['ar'].forward(enc_embeds)
-
-            # calc matmul for InfoNCE
-            z_next = enc_embeds[:, 1:, :]
-            c_t = c[:, :-1, :]
-            # z_preds has shape (bs_large, seq_len_ct, seq_len_znext)
-            z_preds = torch.matmul(c_t, z_next.transpose(1, 2))
             # calc InfoNCE. Positives lies on diagonals.
-            logits = F.log_softmax(z_preds, dim=2)
             loss_cpc = - torch.diagonal(logits, dim1=-2, dim2=-1).mean()
-            # TODO: negative mining
-
-            # calc second head with clf on target and it's loss
-            # output shape is (bs_large, seq_len, out_linear)
-            target_bin_pred = models_dict['target_head'].forward(c)
             # permute target_bin_pred because shape must be (N, C, d1, ..., dn)
             loss_target = F.cross_entropy(target_bin_pred.permute(0, 2, 1), target_bin)
-
-            # calc loss sum and backward
+            # calc sum of losses and backward
             loss = loss_cpc + loss_target
             loss.backward()
             optimizer.step()
@@ -252,55 +229,33 @@ def train_cpc_model(models_dict, train_loader, val_loader,
                                    {'train_batch': metrics.item()},
                                    n_iter_train)
             log_writer.add_scalars('mean_grad_norms',
-                                   {'enc': calc_grad_norm(models_dict['enc']),
-                                    'ar': calc_grad_norm(models_dict['ar']),
-                                    'target_head': calc_grad_norm(models_dict['target_head'])},
+                                   {'enc': calc_grad_norm(cpc_meta_model.encoder),
+                                    'ar': calc_grad_norm(cpc_meta_model.ar),
+                                    'target_head': calc_grad_norm(cpc_meta_model.target_head)},
                                    n_iter_train)
 
             n_iter_train += 1
 
         # validating process
-        models_dict.eval()
+        cpc_meta_model.eval()
         loss_val_batch = [[], [], []]
         metrics_val_batch = []
         for large_x, target, target_bin in tqdm(val_loader, desc='validation', position=0):
             with torch.no_grad():
-                large_x = large_x.to(device=cuda, dtype=torch.float32, non_blocking=True)
-                target = target.to(device=cuda, dtype=torch.float32, non_blocking=True)
+                large_x = large_x.to(device=cuda, non_blocking=True)
+                target = target.to(device=cuda, non_blocking=True)
                 target_bin = target_bin.to(device=cuda, non_blocking=True)
 
-                # large_x has shape (bs_large, bs_small, 1, seq_len)
-                # reshape large_x to (bs_large * bs_small, 1, seq_len) and go through encoder
-                large_x_shape = tuple(large_x.shape)
-                large_x = large_x.view(large_x_shape[0] * large_x_shape[1],
-                                       large_x_shape[2],
-                                       large_x_shape[3])
-                enc_embeds = models_dict['enc'].forward(large_x)
-                # encoder output has shape (bs_large * bs_small, ch_out * len_out), reshape it
-                # to (bs_large, bs_small, ch_out * len_out), bs_small is truly new seq_len
-                enc_embeds = enc_embeds.view(large_x_shape[0], large_x_shape[1], -1)
+                # calc logits from enc and AR models and target_bin_pred from
+                # second head after AR model
+                logits, target_bin_pred = cpc_meta_model.forwart(large_x)
 
-                # input shape of AR model must be (bs_large, seq_len, feat)
-                # output has the same shape (bs_large, seq_len, feat)
-                c = models_dict['ar'].forward(enc_embeds)
-
-                # calc matmul for InfoNCE
-                z_next = enc_embeds[:, 1:, :]
-                c_t = c[:, :-1, :]
-                # z_preds has shape (bs_large, seq_len_ct, seq_len_znext)
-                z_preds = torch.matmul(c_t, z_next.transpose(1, 2))
                 # calc InfoNCE. Positives lies on diagonals.
-                logits = F.log_softmax(z_preds, dim=2)
                 loss_cpc = - torch.diagonal(logits, dim1=-2, dim2=-1).mean()
-
-                # calc second head with clf on target and it's loss
-                # output shape is (bs_large, seq_len, out_linear)
-                target_bin_pred = models_dict['target_head'].forward(c)
                 # permute target_bin_pred because shape must be (N, C, d1, ..., dn)
                 loss_target = F.cross_entropy(target_bin_pred.permute(0, 2, 1), target_bin)
-
-                # calc loss sum and backward
-                loss = loss_cpc + 0.1 * loss_target
+                # calc sum of losses and backward
+                loss = loss_cpc + loss_target
 
                 # calc metrics
                 max_out = torch.argmax(target_bin_pred, -1)
@@ -316,7 +271,7 @@ def train_cpc_model(models_dict, train_loader, val_loader,
         val_mean_metrics = np.mean(metrics_val_batch)
 
         # change lr
-        # lr_scheduler.step(val_mean_loss)
+        lr_scheduler.step(val_mean_loss)
 
         # logging
         log_writer.add_scalars('loss',
@@ -327,17 +282,17 @@ def train_cpc_model(models_dict, train_loader, val_loader,
         log_writer.add_scalars('metrics_MAE',
                                {'val_mean': val_mean_metrics},
                                n_iter_train - 1)
-        # log_writer.add_scalar('lr',
-        #                       optimizer.param_groups[0]['lr'],
-        #                       n_iter_train - 1)
+        log_writer.add_scalar('lr',
+                              optimizer.param_groups[0]['lr'],
+                              n_iter_train - 1)
 
         # saving model
-        # save_path = os.path.join(logs_path, model_name + '_last_state.pth')
-        # save_model(save_path, epoch, model, optimizer, val_mean_loss, val_mean_metrics)
-        #
-        # if epoch == 0 or val_mean_metrics < best_val_mean_metrics:
-        #     best_val_mean_metrics = val_mean_metrics
-        #
-        #     save_path = os.path.join(logs_path, model_name + '_best_state.pth')
-        #     save_model(save_path, epoch, model, optimizer,
-        #                val_mean_loss, val_mean_metrics)
+        save_path = os.path.join(logs_path, model_name + '_last_state.pth')
+        save_model(save_path, epoch, cpc_meta_model, optimizer, val_mean_loss, val_mean_metrics)
+
+        if epoch == 0 or val_mean_metrics < best_val_mean_metrics:
+            best_val_mean_metrics = val_mean_metrics
+
+            save_path = os.path.join(logs_path, model_name + '_best_state.pth')
+            save_model(save_path, epoch, cpc_meta_model, optimizer,
+                       val_mean_loss, val_mean_metrics)
