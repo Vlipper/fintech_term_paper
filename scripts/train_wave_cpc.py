@@ -57,9 +57,6 @@ def main(args):
     num_bins = 17
 
     cpc_meta_model = models.CPCv1(out_size=num_bins-1)
-    # models_dict = nn.ModuleDict({'enc': models.CPCEncoderV1(),
-    #                              'ar': models.CPCAutoregV1(),
-    #                              'target_head': models.CPCTargetHeadV1(out_size=num_bins-1)})
 
     # logs_path = '/mntlong/scripts/logs/'
     logs_path = os.path.abspath(os.path.join(file_dir, os.path.pardir, 'logs'))
@@ -92,8 +89,8 @@ def main(args):
     if args.find_lr:
         from lr_finder import LRFinder
         optimizer = optim.Adam(cpc_meta_model.parameters(), lr=1e-6)
-        lr_find = LRFinder(cpc_meta_model, optimizer, criterion=None, device='cuda')
-        lr_find.range_test(train_loader, end_lr=1, num_iter=50, step_mode='exp')
+        lr_find = LRFinder(cpc_meta_model, optimizer, criterion=None, is_cpc=True, device='cuda')
+        lr_find.range_test(train_loader, end_lr=10, num_iter=75, step_mode='exp')
         best_lr = lr_find.get_best_lr()
         lr_find.plot()
         lr_find.reset()

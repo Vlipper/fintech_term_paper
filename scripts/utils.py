@@ -63,10 +63,12 @@ def calc_grad_norm(model):
     count = 0.0
     for name, param in model.named_parameters():
         if param.grad is not None:
-            # grad += torch.sqrt(torch.sum((tensor.grad.data) ** 2))
             norm += torch.norm(param.grad.data)
             count += 1
-    return norm.item() / count
+    if norm == 0 and count == 0:
+        return 0
+    else:
+        return norm / count
 
 
 def save_model(save_path, epoch, model, optimizer, val_mean_loss, val_mean_metrics):
@@ -209,7 +211,7 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
             # permute target_bin_pred because shape must be (N, C, d1, ..., dn)
             loss_target = F.cross_entropy(target_bin_pred.permute(0, 2, 1), target_bin)
             # calc sum of losses and backward
-            loss = loss_cpc + loss_target
+            loss = loss_cpc  # + loss_target
             loss.backward()
             optimizer.step()
 
@@ -220,19 +222,29 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
             metrics = F.l1_loss(bin_centroids, target)
 
             # write logs
-            log_writer.add_scalars('loss',
-                                   {'train_batch_loss': loss.item(),
-                                    'train_batch_loss_cpc': loss_cpc.item(),
-                                    'train_batch_loss_target': loss_target.item()},
-                                   n_iter_train)
-            log_writer.add_scalars('metrics_MAE',
-                                   {'train_batch': metrics.item()},
-                                   n_iter_train)
-            log_writer.add_scalars('mean_grad_norms',
-                                   {'enc': calc_grad_norm(cpc_meta_model.encoder),
-                                    'ar': calc_grad_norm(cpc_meta_model.ar),
-                                    'target_head': calc_grad_norm(cpc_meta_model.target_head)},
-                                   n_iter_train)
+            log_writer.add_scalar('losses/train_sum', loss.item(), n_iter_train)
+            log_writer.add_scalar('losses/train_cpc', loss_cpc.item(), n_iter_train)
+            # log_writer.add_scalar('losses/train_target', loss_target.item(), n_iter_train)
+
+            log_writer.add_scalar('metrics_MAE/train', metrics.item(), n_iter_train)
+
+            log_writer.add_scalar('grad_norms/encoder', calc_grad_norm(cpc_meta_model.encoder), n_iter_train)
+            log_writer.add_scalar('grad_norms/ar', calc_grad_norm(cpc_meta_model.ar), n_iter_train)
+            # log_writer.add_scalar('grad_norms/target_head', calc_grad_norm(cpc_meta_model.target_head), n_iter_train)
+
+            # log_writer.add_scalars('loss',
+            #                        {'train_batch_loss': loss.item(),
+            #                         'train_batch_loss_cpc': loss_cpc.item(),
+            #                         'train_batch_loss_target': loss_target.item()},
+            #                        n_iter_train)
+            # log_writer.add_scalars('metrics_MAE',
+            #                        {'train_batch': metrics.item()},
+            #                        n_iter_train)
+            # log_writer.add_scalars('mean_grad_norms',
+            #                        {'enc': calc_grad_norm(cpc_meta_model.encoder),
+            #                         'ar': calc_grad_norm(cpc_meta_model.ar),
+            #                         'target_head': calc_grad_norm(cpc_meta_model.target_head)},
+            #                        n_iter_train)
 
             n_iter_train += 1
 
@@ -255,7 +267,7 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
                 # permute target_bin_pred because shape must be (N, C, d1, ..., dn)
                 loss_target = F.cross_entropy(target_bin_pred.permute(0, 2, 1), target_bin)
                 # calc sum of losses and backward
-                loss = loss_cpc + loss_target
+                loss = loss_cpc  # + loss_target
 
                 # calc metrics
                 max_out = torch.argmax(target_bin_pred, -1)
@@ -274,17 +286,21 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
         lr_scheduler.step(val_mean_loss)
 
         # logging
-        log_writer.add_scalars('loss',
-                               {'val_mean_loss': np.mean(loss_val_batch[0]),
-                                'val_mean_loss_cpc': np.mean(loss_val_batch[1]),
-                                'val_mean_loss_target': np.mean(loss_val_batch[2])},
-                               n_iter_train - 1)
-        log_writer.add_scalars('metrics_MAE',
-                               {'val_mean': val_mean_metrics},
-                               n_iter_train - 1)
-        log_writer.add_scalar('lr',
-                              optimizer.param_groups[0]['lr'],
-                              n_iter_train - 1)
+        # log_writer.add_scalars('loss',
+        #                        {'val_mean_loss': np.mean(loss_val_batch[0]),
+        #                         'val_mean_loss_cpc': np.mean(loss_val_batch[1]),
+        #                         'val_mean_loss_target': np.mean(loss_val_batch[2])},
+        #                        n_iter_train - 1)
+        # log_writer.add_scalars('metrics_MAE',
+        #                        {'val_mean': val_mean_metrics},
+        #                        n_iter_train - 1)
+        log_writer.add_scalar('losses/val_sum', np.mean(loss_val_batch[0]), n_iter_train - 1)
+        log_writer.add_scalar('losses/val_cpc', np.mean(loss_val_batch[1]), n_iter_train - 1)
+        # log_writer.add_scalar('losses/val_target', np.mean(loss_val_batch[2]), n_iter_train - 1)
+
+        log_writer.add_scalar('metrics_MAE/val', val_mean_metrics, n_iter_train - 1)
+
+        log_writer.add_scalar('lr', optimizer.param_groups[0]['lr'], n_iter_train - 1)
 
         # saving model
         save_path = os.path.join(logs_path, model_name + '_last_state.pth')

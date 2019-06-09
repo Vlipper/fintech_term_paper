@@ -1,3 +1,4 @@
+import argparse
 import os
 from tqdm import tqdm
 import subprocess
@@ -14,6 +15,13 @@ import torch
 from torch.utils.data import DataLoader
 cuda = torch.device('cuda')
 cpu = torch.device('cpu')
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_name', required=True, type=str)
+    # parser.add_argument('--batch_size', default=5, type=int)
+    return parser.parse_args()
 
 
 def test_inference(model, data_loader):
@@ -33,11 +41,11 @@ def test_inference(model, data_loader):
     return preds
 
 
-def main():
+def main(args):
     num_bins = 17
 
     model = models.CPCv1(out_size=num_bins-1)
-    model_name = 'wave_net_cpc_default' + '_best_state.pth'  # _best_state, _last_state
+    model_name = args.model_name + '_best_state.pth'  # _best_state, _last_state
 
     # model_path = '/mntlong/lanl_comp/logs/' + model_name
     file_dir = os.path.dirname(__file__)
@@ -53,7 +61,8 @@ def main():
     test_names = os.listdir(test_data_path)
     # test_names = test_names[:200]
 
-    batch_size = 10
+    batch_size = 64  # {16, 32, 41, 64, 82, ...}
+    test_names = np.array(test_names).reshape(-1, batch_size)
 
     # params
     large_ws = 150000
@@ -63,11 +72,14 @@ def main():
     for wave_num, test_wave in enumerate(tqdm(test_names,
                                               desc='test inference',
                                               position=0)):
-        wave_data = np.loadtxt(os.path.join(test_data_path, test_wave),
-                               dtype=np.float32, skiprows=1)
+        wave_data = np.empty(0)
+        for wave_name in test_wave:
+            loaded_wave = np.loadtxt(os.path.join(test_data_path, wave_name),
+                                     dtype=np.float32, skiprows=1)
+            wave_data = np.concatenate((wave_data, loaded_wave))
 
         test_dataset = data.SignalCPCDataset(wave_data, target=None, num_bins=None,
-                                             idxs_wave_end=[1500000],
+                                             idxs_wave_end=[150000000],
                                              large_ws=large_ws,
                                              overlap_size=overlap_size,
                                              small_ws=small_ws)
@@ -118,4 +130,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+    main(args)

@@ -42,7 +42,8 @@ class LRFinder(object):
 
     """
 
-    def __init__(self, model, optimizer, criterion, device=None, memory_cache=True, cache_dir=None):
+    def __init__(self, model, optimizer, criterion, is_cpc=False,
+                 device=None, memory_cache=True, cache_dir=None):
         self.model = model
         self.optimizer = optimizer
         self.criterion = criterion
@@ -50,6 +51,7 @@ class LRFinder(object):
         self.best_loss = None
         self.memory_cache = memory_cache
         self.cache_dir = cache_dir
+        self.is_cpc = is_cpc
 
         # Save the original state of the model and optimizer so they can be restored if
         # needed
@@ -166,11 +168,13 @@ class LRFinder(object):
         # Forward pass
         self.optimizer.zero_grad()
         outputs = self.model(inputs)
-        # loss = self.criterion(outputs, labels)
 
-        loss_cpc = - torch.diagonal(outputs[0], dim1=-2, dim2=-1).mean()
-        loss_target = F.cross_entropy(outputs[1].permute(0, 2, 1), labels)
-        loss = loss_cpc + loss_target
+        if self.is_cpc:
+            loss_cpc = - torch.diagonal(outputs[0], dim1=-2, dim2=-1).mean()
+            loss_target = F.cross_entropy(outputs[1].permute(0, 2, 1), labels)
+            loss = loss_cpc  # + loss_target
+        else:
+            loss = self.criterion(outputs, labels)
 
         # Backward pass
         loss.backward()
