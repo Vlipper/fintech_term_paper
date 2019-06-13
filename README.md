@@ -57,6 +57,6 @@ https://www.kaggle.com/c/LANL-Earthquake-Prediction/
 2. Запустить скрипт `compress_source_data.py` - он прочитает исходный `.csv` и 
 сохранит его в более быстрый формат `.npz`
 3. Выбрать один из описанных выше подходов и запустить соответствующий скрипт:  
-  3.1 train_wave.py - тренировка CNN на голом сигале
-  3.2 train_spect.py - тренировка CNN на спектрограммах
+  3.1 train_wave.py - тренировка CNN на голом сигнале  
+  3.2 train_spect.py - тренировка CNN на спектрограммах  
   3.3 train_wave_cpc.py - тренировка CPC
