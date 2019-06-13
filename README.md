@@ -1,4 +1,5 @@
 # Attempt to get LANL Earthquake Prediction
+https://www.kaggle.com/c/LANL-Earthquake-Prediction/
 
 ## EDA
 Тренировочный датасет включает в себя два вектора: сигнал и время до землетрясения
