@@ -214,7 +214,7 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
             # permute target_bin_pred because shape must be (N, C, d1, ..., dn)
             loss_target = F.cross_entropy(target_bin_pred.permute(0, 2, 1), target_bin)
             # calc sum of losses and backward
-            loss = loss_cpc #+ loss_target
+            loss = loss_cpc + 0.05*loss_target
             loss.backward()
             optimizer.step()
 
@@ -254,7 +254,7 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
                 # permute target_bin_pred because shape must be (N, C, d1, ..., dn)
                 loss_target = F.cross_entropy(target_bin_pred.permute(0, 2, 1), target_bin)
                 # calc sum of losses and backward
-                loss = loss_cpc #+ loss_target
+                loss = loss_cpc + 0.05*loss_target
 
                 # calc metrics
                 max_out = torch.argmax(target_bin_pred, -1)

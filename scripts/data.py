@@ -143,7 +143,7 @@ class SignalCPCDataset(Dataset):
 
         if self.scale_clamp:
             signal = (signal - self.mean) / self.std
-            signal = np.clip(signal, self.clamp_min, self.clamp_max)
+            # signal = np.clip(signal, self.clamp_min, self.clamp_max)
 
         # if signal.shape[0] < self.small_ws:
         #     signal = utils.left_padding(signal, self.small_ws)
