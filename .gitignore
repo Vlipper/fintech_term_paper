@@ -107,3 +107,4 @@ venv.bak/
 *.npz
 *.csv
 *.xml
+.idea
