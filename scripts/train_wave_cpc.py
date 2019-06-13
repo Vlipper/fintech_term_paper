@@ -1,12 +1,12 @@
 import argparse
 import os
 from datetime import datetime
-import sys
+# import sys
 
 import pandas as pd
 import numpy as np
 
-# import torch
+import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -75,22 +75,16 @@ def main(args):
 
     print('x_t size:', train_dataset[0][0].size())
 
-    train_loader = DataLoader(dataset=train_dataset,
-                              batch_size=args.batch_size,
-                              shuffle=True,
-                              num_workers=5,
-                              pin_memory=True)
-    val_loader = DataLoader(dataset=val_dataset,
-                            batch_size=args.batch_size,
-                            shuffle=False,
-                            num_workers=5,
-                            pin_memory=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size,
+                              shuffle=True, num_workers=5, pin_memory=True)
+    val_loader = DataLoader(dataset=val_dataset, batch_size=args.batch_size,
+                            shuffle=False, num_workers=5, pin_memory=True)
 
     if args.find_lr:
         from lr_finder import LRFinder
         optimizer = optim.Adam(cpc_meta_model.parameters(), lr=1e-6)
         lr_find = LRFinder(cpc_meta_model, optimizer, criterion=None, is_cpc=True, device='cuda')
-        lr_find.range_test(train_loader, end_lr=10, num_iter=75, step_mode='exp')
+        lr_find.range_test(train_loader, end_lr=2, num_iter=75, step_mode='exp')
         best_lr = lr_find.get_best_lr()
         lr_find.plot()
         lr_find.reset()
@@ -99,13 +93,18 @@ def main(args):
         best_lr = 3e-4
     # sys.exit()
 
+    # model_path = os.path.join(logs_path, 'cpc_no_target_head_cont_last_state.pth')
+    # cpc_meta_model.load_state_dict(torch.load(model_path)['model_state_dict'])
+    # cpc_meta_model.to(torch.device('cuda'))
+
     optimizer = optim.Adam(cpc_meta_model.parameters(), lr=best_lr)
+    # optimizer.load_state_dict(torch.load(model_path)['optimizer_state_dict'])
     lr_sched = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                     factor=0.5,
                                                     patience=3,
                                                     threshold=0.005)
+
     log_writer = SummaryWriter(log_writer_path)
-    # log_writer = None
 
     utils.train_cpc_model(cpc_meta_model=cpc_meta_model, optimizer=optimizer,
                           num_bins=num_bins, lr_scheduler=lr_sched,

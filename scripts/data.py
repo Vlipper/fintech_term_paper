@@ -106,7 +106,7 @@ class SpectrogramDataset(Dataset):
 class SignalCPCDataset(Dataset):
     def __init__(self, signal, target, idxs_wave_end, num_bins,
                  large_ws=150000, overlap_size=5000, small_ws=15000,
-                 scale_clamp=True):
+                 scale_clamp=True, clamp_min=-10, clamp_max=10):
         super().__init__()
 
         self.signal = signal
@@ -115,6 +115,8 @@ class SignalCPCDataset(Dataset):
         self.scale_clamp = scale_clamp
         self.mean = 4.5195
         self.std = 10.7357
+        self.clamp_min = clamp_min
+        self.clamp_max = clamp_max
 
         # make borders for every example
         #  and exclude borders which include different waves
@@ -141,9 +143,7 @@ class SignalCPCDataset(Dataset):
 
         if self.scale_clamp:
             signal = (signal - self.mean) / self.std
-            # signal = torch.clamp(signal,
-            #                      self.mean - 3 * self.std,
-            #                      self.mean + 3 * self.std)
+            signal = np.clip(signal, self.clamp_min, self.clamp_max)
 
         # if signal.shape[0] < self.small_ws:
         #     signal = utils.left_padding(signal, self.small_ws)

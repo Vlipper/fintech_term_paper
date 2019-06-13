@@ -172,7 +172,7 @@ class LRFinder(object):
         if self.is_cpc:
             loss_cpc = - torch.diagonal(outputs[0], dim1=-2, dim2=-1).mean()
             loss_target = F.cross_entropy(outputs[1].permute(0, 2, 1), labels)
-            loss = loss_cpc  # + loss_target
+            loss = loss_cpc #+ loss_target
         else:
             loss = self.criterion(outputs, labels)
 

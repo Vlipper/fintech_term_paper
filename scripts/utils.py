@@ -71,9 +71,11 @@ def calc_grad_norm(model):
         return norm / count
 
 
-def save_model(save_path, epoch, model, optimizer, val_mean_loss, val_mean_metrics):
+def save_model(save_path, epoch, n_iter_train, model, optimizer,
+               val_mean_loss, val_mean_metrics):
     torch.save({
         'epoch': epoch,
+        'n_iter_train': n_iter_train,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'val_mean_loss': val_mean_loss,
@@ -186,11 +188,12 @@ def train_clf_model(model, optimizer, lr_scheduler, train_loader, val_loader,
 
 def train_cpc_model(cpc_meta_model, train_loader, val_loader,
                     optimizer, lr_scheduler, num_epochs,
-                    model_name, logs_path, log_writer, num_bins):
+                    model_name, logs_path, log_writer, num_bins,
+                    n_iter_train=1):
     cpc_meta_model.to(cuda)
 
     torch_bins = torch.linspace(0, 16.11, num_bins, dtype=torch.float32)
-    n_iter_train = 1
+    # n_iter_train = 1
     for epoch in range(num_epochs):
         # training process
         cpc_meta_model.train()
@@ -211,7 +214,7 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
             # permute target_bin_pred because shape must be (N, C, d1, ..., dn)
             loss_target = F.cross_entropy(target_bin_pred.permute(0, 2, 1), target_bin)
             # calc sum of losses and backward
-            loss = loss_cpc  # + loss_target
+            loss = loss_cpc #+ loss_target
             loss.backward()
             optimizer.step()
 
@@ -224,27 +227,11 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
             # write logs
             log_writer.add_scalar('losses/train_sum', loss.item(), n_iter_train)
             log_writer.add_scalar('losses/train_cpc', loss_cpc.item(), n_iter_train)
-            # log_writer.add_scalar('losses/train_target', loss_target.item(), n_iter_train)
-
+            log_writer.add_scalar('losses/train_target', loss_target.item(), n_iter_train)
             log_writer.add_scalar('metrics_MAE/train', metrics.item(), n_iter_train)
-
             log_writer.add_scalar('grad_norms/encoder', calc_grad_norm(cpc_meta_model.encoder), n_iter_train)
             log_writer.add_scalar('grad_norms/ar', calc_grad_norm(cpc_meta_model.ar), n_iter_train)
-            # log_writer.add_scalar('grad_norms/target_head', calc_grad_norm(cpc_meta_model.target_head), n_iter_train)
-
-            # log_writer.add_scalars('loss',
-            #                        {'train_batch_loss': loss.item(),
-            #                         'train_batch_loss_cpc': loss_cpc.item(),
-            #                         'train_batch_loss_target': loss_target.item()},
-            #                        n_iter_train)
-            # log_writer.add_scalars('metrics_MAE',
-            #                        {'train_batch': metrics.item()},
-            #                        n_iter_train)
-            # log_writer.add_scalars('mean_grad_norms',
-            #                        {'enc': calc_grad_norm(cpc_meta_model.encoder),
-            #                         'ar': calc_grad_norm(cpc_meta_model.ar),
-            #                         'target_head': calc_grad_norm(cpc_meta_model.target_head)},
-            #                        n_iter_train)
+            log_writer.add_scalar('grad_norms/target_head', calc_grad_norm(cpc_meta_model.target_head), n_iter_train)
 
             n_iter_train += 1
 
@@ -267,7 +254,7 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
                 # permute target_bin_pred because shape must be (N, C, d1, ..., dn)
                 loss_target = F.cross_entropy(target_bin_pred.permute(0, 2, 1), target_bin)
                 # calc sum of losses and backward
-                loss = loss_cpc  # + loss_target
+                loss = loss_cpc #+ loss_target
 
                 # calc metrics
                 max_out = torch.argmax(target_bin_pred, -1)
@@ -286,29 +273,20 @@ def train_cpc_model(cpc_meta_model, train_loader, val_loader,
         lr_scheduler.step(val_mean_loss)
 
         # logging
-        # log_writer.add_scalars('loss',
-        #                        {'val_mean_loss': np.mean(loss_val_batch[0]),
-        #                         'val_mean_loss_cpc': np.mean(loss_val_batch[1]),
-        #                         'val_mean_loss_target': np.mean(loss_val_batch[2])},
-        #                        n_iter_train - 1)
-        # log_writer.add_scalars('metrics_MAE',
-        #                        {'val_mean': val_mean_metrics},
-        #                        n_iter_train - 1)
-        log_writer.add_scalar('losses/val_sum', np.mean(loss_val_batch[0]), n_iter_train - 1)
+        log_writer.add_scalar('losses/val_sum', val_mean_loss, n_iter_train - 1)
         log_writer.add_scalar('losses/val_cpc', np.mean(loss_val_batch[1]), n_iter_train - 1)
-        # log_writer.add_scalar('losses/val_target', np.mean(loss_val_batch[2]), n_iter_train - 1)
-
+        log_writer.add_scalar('losses/val_target', np.mean(loss_val_batch[2]), n_iter_train - 1)
         log_writer.add_scalar('metrics_MAE/val', val_mean_metrics, n_iter_train - 1)
-
         log_writer.add_scalar('lr', optimizer.param_groups[0]['lr'], n_iter_train - 1)
 
         # saving model
         save_path = os.path.join(logs_path, model_name + '_last_state.pth')
-        save_model(save_path, epoch, cpc_meta_model, optimizer, val_mean_loss, val_mean_metrics)
+        save_model(save_path, epoch, n_iter_train, cpc_meta_model, optimizer,
+                   val_mean_loss, val_mean_metrics)
 
-        if epoch == 0 or val_mean_metrics < best_val_mean_metrics:
-            best_val_mean_metrics = val_mean_metrics
+        if epoch == 0 or val_mean_loss < best_val_mean_loss:
+            best_val_mean_loss = val_mean_loss
 
             save_path = os.path.join(logs_path, model_name + '_best_state.pth')
-            save_model(save_path, epoch, cpc_meta_model, optimizer,
+            save_model(save_path, epoch, n_iter_train, cpc_meta_model, optimizer,
                        val_mean_loss, val_mean_metrics)
