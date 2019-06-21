@@ -1,5 +1,6 @@
 # Attempt to get LANL Earthquake Prediction
 https://www.kaggle.com/c/LANL-Earthquake-Prediction/
+
 Финальный текст работы: [ссылка](final_paper_text.pdf)
 
 ## EDA
